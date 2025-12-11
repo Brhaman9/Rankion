@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Rankion — Coming Soon</title>
+<meta name="description" content="Rankion — A real-life ranking system. Your rank never lies. Coming soon." />
+<style>
+  :root{
+    --bg: #000000;
+    --surface: #0b0b0b;
+    --card: #0f0f10;
+    --muted: rgba(255,255,255,0.64);
+    --muted-2: rgba(255,255,255,0.42);
+    --text: #ffffff;
+    --accent: #c9a056;
+    --radius: 14px;
+    --gap: 20px;
+    --container: 1100px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: linear-gradient(180deg, #000 0%, #050505 100%);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    display:flex;
+    justify-content:center;
+    padding:36px 18px;
+    overflow-y:auto;
+  }
+
+  /* subtle moving background gradient for premium feel */
+  .bg-anim{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    opacity:0.05;
+    mix-blend-mode:screen;
+  }
+  .bg-anim::before{
+    content:"";
+    position:absolute;
+    left:-40%;
+    top:-25%;
+    width:180%;
+    height:150%;
+    background:
+      radial-gradient(42% 60% at 12% 18%, rgba(255,255,255,0.98), rgba(255,255,255,0.24) 8%, rgba(255,255,255,0.06) 20%, transparent 40%),
+      radial-gradient(26% 36% at 86% 82%, rgba(255,255,255,0.6), rgba(255,255,255,0.06) 12%, transparent 40%);
+    filter: blur(42px);
+    animation: glide 12s linear infinite;
+  }
+  @keyframes glide{
+    0%{ transform: translateX(-6%); }
+    50%{ transform: translateX(6%); }
+    100%{ transform: translateX(-6%); }
+  }
+
+  .site {
+    width:100%;
+    max-width:var(--container);
+    z-index:2;
+  }
+
+  /* TOP NAV (Sign in removed) */
+  .top-nav{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 12px;
+    margin-bottom:18px;
+  }
+  .brand {
+    display:flex;
+    gap:12px;
+    align-items:center;
+  }
+  .brand .logo-circle{
+    width:34px; height:34px;
+    border-radius:8px;
+    background:linear-gradient(180deg,#1a1a1a,#0d0d0d);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text); font-weight:700; font-size:14px;
+    border:1px solid rgba(255,255,255,0.04);
+  }
+  .brand .meta{
+    font-size:13px;
+    color:var(--muted-2);
+    line-height:1;
+  }
+
+  main {
+    display:flex;
+    flex-direction:column;
+    gap:var(--gap);
+    align-items:stretch;
+    padding-bottom:60px;
+  }
+
+  /* SECTION CARD base */
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid rgba(255,255,255,0.03);
+    border-radius:var(--radius);
+    padding:28px;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.6);
+  }
+
+  /* NEW CENTERED HERO */
+  .hero-centered {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+    padding:70px 28px;
+  }
+  .pill{
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.06);
+    padding:8px 18px;
+    border-radius:999px;
+    color:var(--muted-2);
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+  }
+  .brandname {
+    font-size:48px;
+    font-weight:800;
+    letter-spacing:0.48em;
+    text-indent:0.48em;
+    text-align:center;
+    margin-top:8px;
+    margin-bottom:6px;
+    color:var(--text);
+  }
+  .hero-tag {
+    font-size:18px;
+    letter-spacing:0.12em;
+    text-align:center;
+    color:var(--muted-2);
+    margin-bottom:10px;
+  }
+  .hero-sub {
+    max-width:640px;
+    color:var(--muted);
+    text-align:center;
+    font-size:15px;
+    line-height:1.5;
+  }
+
+  /* three feature boxes row (what rankion is) */
+  .features-row {
+    display:flex;
+    gap:14px;
+    justify-content:space-between;
+    margin-top:6px;
+  }
+  .feature {
+    flex:1;
+    padding:18px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.02);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  }
+  .feature h4 { margin:0 0 6px; font-size:15px; }
+  .feature p { margin:0; color:var(--muted); font-size:13px; }
+
+  /* tier bar */
+  .tier-card { padding:22px; }
+  .tier-title { font-size:20px; margin-bottom:12px; }
+  .tier-bar {
+    display:flex;
+    gap:10px;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .tier {
+    flex:1;
+    text-align:center;
+    padding:12px 8px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.03);
+    color:var(--muted-2);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    font-weight:600;
+  }
+
+  /* card showcase */
+  .card-show {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:18px;
+    align-items:center;
+  }
+  .card-preview {
+    height:140px;
+    border-radius:10px;
+    background: linear-gradient(180deg,#050505,#0b0b0b);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid rgba(255,255,255,0.04);
+  }
+  .card-bullets {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .bullet {
+    padding:10px 12px;
+    border-radius:8px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    border:1px solid rgba(255,255,255,0.02);
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* dashboard preview */
+  .dash-grid {
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .dash-item {
+    flex:1;
+    min-width:180px;
+    padding:14px;
+    border-radius:10px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    border:1px solid rgba(255,255,255,0.02);
+  }
+  .dash-item h5 { margin:0 0 6px; font-size:13px; color:var(--muted-2) }
+  .dash-item p { margin:0; font-weight:700; font-size:18px }
+
+  /* challenges / leaderboard area */
+  .small-cards {
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .small-cards .small {
+    flex:1;
+    min-width:200px;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.02);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    color:var(--muted);
+  }
+
+  /* pricing */
+  .pricing {
+    display:flex;
+    gap:18px;
+    justify-content:space-between;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+  .pricing .price-box {
+    flex:1;
+    padding:20px;
+    border-radius:10px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    border:1px solid rgba(255,255,255,0.02);
+  }
+  .price-amount {
+    font-size:20px;
+    font-weight:800;
+  }
+  .price-list { margin-top:12px; color:var(--muted); font-size:14px; }
+
+  /* footer CTA */
+  .footer-cta {
+    text-align:center;
+    padding:28px;
+  }
+
+  /* Coming Soon modal */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:9999;
+  }
+  .modal {
+    background: linear-gradient(180deg,#0b0b0b,#0a0a0a);
+    padding:22px; border-radius:12px; border:1px solid rgba(255,255,255,0.04);
+    width:92%; max-width:560px; text-align:center;
+  }
+  .modal h3{ margin:0 0 8px; font-size:20px }
+  .modal p{ margin:0 0 16px; color:var(--muted) }
+
+  /* responsive */
+  @media (max-width:920px){
+    .card-show { grid-template-columns: 1fr; }
+    .features-row { flex-direction:column; }
+    .pricing { flex-direction:column; }
+    .brand .meta { display:none; }
+  }
+  @media (max-width:520px){
+    .hero-centered { padding:40px 18px }
+    .brandname { font-size:34px; letter-spacing:0.36em; text-indent:0.36em }
+    .hero-tag { font-size:14px }
+  }
+</style>
+</head>
+<body>
+  <div class="bg-anim" aria-hidden="true"></div>
+
+  <div class="site">
+    <!-- TOP NAV (Sign in removed) -->
+    <div class="top-nav" role="navigation" aria-label="Top">
+      <div class="brand" aria-hidden="false">
+        <div class="logo-circle">R</div>
+        <div>
+          <div style="font-weight:700">Rankion</div>
+          <div class="meta">Discipline · Hierarchy · Identity</div>
+        </div>
+      </div>
+    </div>
+
+    <main>
+      <!-- Centered minimal HERO as requested -->
+      <section class="card hero-centered" aria-labelledby="hero-title">
+        <div class="pill">PHASE 1 // ACCESS LOCKED</div>
+
+        <div class="brandname" role="heading" aria-level="1">RANKION</div>
+
+        <div class="hero-tag">YOUR RANK NEVER LIES.</div>
+
+        <p class="hero-sub">A real-life ranking system for discipline, identity and performance. Coming soon.</p>
+      </section>
+
+      <!-- WHAT RANKION IS -->
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px">
+          <div style="font-weight:700">What Rankion actually is</div>
+        </div>
+
+        <div class="features-row" style="margin-top:10px;">
+          <div class="feature">
+            <h4>Earn XP from daily discipline</h4>
+            <p>Complete tasks. Build streaks. Level up.</p>
+          </div>
+          <div class="feature">
+            <h4>Climb real Rank Tiers (E → S)</h4>
+            <p>Your identity evolves as your rank rises.</p>
+          </div>
+          <div class="feature">
+            <h4>Show your rank with a physical card</h4>
+            <p>A premium PVC card with your live QR profile.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- RANK TIERS -->
+      <section class="card tier-card">
+        <div class="tier-title">Rise through the ranks.</div>
+        <div style="color:var(--muted); margin-bottom:12px">Each tier tells a story of who you are. Earn XP, improve your streak, and ascend from E-tier all the way to S-tier.</div>
+        <div class="tier-bar" aria-hidden="true">
+          <div class="tier">E</div>
+          <div class="tier">D</div>
+          <div class="tier">C</div>
+          <div class="tier">B</div>
+          <div class="tier">A</div>
+          <div class="tier" style="background: linear-gradient(180deg, rgba(201,160,86,0.12), transparent); color:var(--text); border-color:rgba(201,160,86,0.12)">S</div>
+        </div>
+      </section>
+
+      <!-- CARD SHOWCASE -->
+      <section class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:300px">
+            <div style="font-weight:700; font-size:18px; margin-bottom:8px">Your identity. In your pocket.</div>
+            <div style="color:var(--muted); margin-bottom:12px">Every Rankion member receives a premium matte-black card with a live QR profile. Your rank updates in real time — so does your card.</div>
+            <div class="card-bullets">
+              <div class="bullet">Personalized card serial</div>
+              <div class="bullet">Dynamic QR</div>
+              <div class="bullet">Matte finish</div>
+              <div class="bullet">Gold/white accents</div>
+            </div>
+          </div>
+          <div style="flex:1; min-width:260px">
+            <div class="card-preview" aria-hidden="true">
+              <div style="width:240px; height:120px; border-radius:10px; background:linear-gradient(180deg,#0a0a0a,#0d0d0d); border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; align-items:center; justify-content:center">
+                <div style="font-weight:700; letter-spacing:0.3em">R A N K I O N</div>
+                <div style="font-size:11px; color:var(--muted); margin-top:8px">Premium matte PVC • QR live</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD PREVIEW -->
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px">
+          <div style="font-weight:700">Designed for discipline. Built for clarity.</div>
+        </div>
+
+        <div style="color:var(--muted); margin-bottom:14px">A simple dashboard that keeps you focused: Daily tasks → XP → Rank progression — nothing extra.</div>
+
+        <div class="dash-grid">
+          <div class="dash-item">
+            <h5>XP & Rank</h5>
+            <p>S-tier ready</p>
+          </div>
+          <div class="dash-item">
+            <h5>Streak</h5>
+            <p>14 days</p>
+          </div>
+          <div class="dash-item">
+            <h5>Today</h5>
+            <p>3 tasks queued</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- CHALLENGES -->
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px">
+          <div style="font-weight:700">Compete. Improve. Win.</div>
+        </div>
+        <div style="color:var(--muted); margin-bottom:12px">Join seasonal ranked challenges, climb the leaderboard, and earn real rewards.</div>
+        <div class="small-cards">
+          <div class="small"><strong>Weekly challenges</strong><div style="color:var(--muted); margin-top:6px">Short sprints to test consistency.</div></div>
+          <div class="small"><strong>Monthly streaks</strong><div style="color:var(--muted); margin-top:6px">Protect your streak or drop a tier.</div></div>
+          <div class="small"><strong>Seasonal rank race</strong><div style="color:var(--muted); margin-top:6px">Push for S-tier before the season ends.</div></div>
+        </div>
+      </section>
+
+      <!-- PRICING -->
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap">
+          <div class="price-box" style="flex:1; min-width:320px;">
+            <div style="font-weight:700; font-size:18px">Membership: ₹399 / year</div>
+            <div class="price-list">
+              <ul style="margin:12px 0 0 18px; padding:0; color:var(--muted)">
+                <li>Physical Rankion card</li>
+                <li>Rank tracking dashboard</li>
+                <li>QR profile</li>
+                <li>Challenges & rewards</li>
+                <li>Leaderboards</li>
+                <li>Early access perks</li>
+              </ul>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+              <input class="input" type="email" placeholder="Email to receive password (optional)" aria-label="email small" style="min-width:220px;">
+              <button class="btn primary" data-action="get">Get Rankion</button>
+            </div>
+          </div>
+
+          <div style="flex:1; min-width:260px; padding-left:6px;">
+            <div style="color:var(--muted)">Why it matters</div>
+            <div style="margin-top:8px; color:var(--muted); font-size:14px">Membership gives you access to the full Rankion system, the physical card, and seasonal rewards.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER CTA -->
+      <section class="card footer-cta">
+        <h3 style="margin:0 0 8px">Take control of your identity.</h3>
+        <div style="color:var(--muted); margin-bottom:12px">Start your Rankion journey.</div>
+        <div style="display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap">
+          <input class="input" type="email" placeholder="Email to receive password (optional)" aria-label="footer email" style="min-width:260px;">
+          <button class="btn primary" data-action="join">Join Closed Alpha</button>
+        </div>
+        <div style="margin-top:12px; color:var(--muted-2)">© Rankion — Your rank never lies.</div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Coming Soon modal -->
+  <div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+      <h3>Coming soon</h3>
+      <p>Rankion is launching soon. Join the waitlist and we’ll notify you when doors open.</p>
+      <div style="display:flex; gap:10px; justify-content:center; margin-top:14px;">
+        <button class="btn" id="closeModal">Close</button>
+        <button class="btn primary" id="modalOk">Join Waitlist</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Modal logic for all join buttons
+  const modal = document.getElementById('modal');
+  const closeModal = document.getElementById('closeModal');
+  const modalOk = document.getElementById('modalOk');
+
+  function showModal(){
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+  }
+  function hideModal(){
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  document.querySelectorAll('[data-action="join"], [data-action="get"]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.preventDefault();
+      showModal();
+    });
+  });
+
+  document.querySelectorAll('[data-action="learn"]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.preventDefault();
+      showModal();
+    });
+  });
+
+  closeModal.addEventListener('click', hideModal);
+  modalOk.addEventListener('click', function(){
+    hideModal();
+    setTimeout(()=> alert('Thanks — we will notify you when Rankion launches.'), 200);
+  });
+
+  // close modal on backdrop click
+  document.getElementById('modal').addEventListener('click', function(e){
+    if(e.target === this) hideModal();
+  });
+
+  // allow ESC key to close
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') hideModal();
+  });
+</script>
+</body>
+</html>
