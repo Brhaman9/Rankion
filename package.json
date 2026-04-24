@@ -1,0 +1,11 @@
+{
+  "name": "rankion",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.3.0"
+  }
+}
