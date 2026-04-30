@@ -1,94 +1,335 @@
-import {
-    BlobPreconditionFailedError,
-    get,
-    head,
-    put
-} from "@vercel/blob";
+import { google } from "googleapis";
 
-const STATE_PATHNAME = "rankion/shared-state.json";
 const MAX_LEVEL = 300;
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const CATEGORY_KEYS = new Set(["physique", "earnings", "intelligence"]);
+const SHEET_NAMES = {
+    state: "State",
+    tasks: "Tasks",
+    history: "History",
+    activity: "Activity"
+};
+const HEADERS = {
+    [SHEET_NAMES.state]: [["field", "value"]],
+    [SHEET_NAMES.tasks]: [[
+        "id",
+        "name",
+        "category",
+        "repeatType",
+        "targetPerWeek",
+        "scheduledDaysJson",
+        "completedDatesJson"
+    ]],
+    [SHEET_NAMES.history]: [[
+        "date",
+        "tasksCompleted",
+        "xpEarned",
+        "completedTasksJson"
+    ]],
+    [SHEET_NAMES.activity]: [[
+        "timestamp",
+        "eventType",
+        "taskName",
+        "category",
+        "remark",
+        "xpDelta",
+        "currentLevel",
+        "currentXp",
+        "currentStreak",
+        "detailsJson"
+    ]]
+};
 
 export default async function handler(request) {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    const missingEnv = getMissingEnvVars();
+    if (missingEnv.length) {
         return json(
             {
-                error: "Vercel Blob is not connected. Add a private Blob store to this project."
+                error: `Google Sheets setup missing: ${missingEnv.join(", ")}`
             },
             503
         );
     }
 
-    if (request.method === "GET") {
-        const currentState = await readStateFromBlob();
-        return json({ state: currentState.state }, 200);
-    }
+    try {
+        const sheets = createSheetsClient();
+        const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 
-    if (request.method === "PUT") {
-        let payload;
+        await ensureSheetsExist(sheets, spreadsheetId);
 
-        try {
-            payload = await request.json();
-        } catch (error) {
-            return json({ error: "Invalid JSON body." }, 400);
+        if (request.method === "GET") {
+            const state = await readStateFromSpreadsheet(sheets, spreadsheetId);
+            return json({ state }, 200);
         }
 
-        const nextState = sanitizeStateSnapshot(payload?.state || payload);
-        const savedState = await saveStateToBlob(nextState);
-        return json({ state: savedState }, 200);
-    }
+        if (request.method === "PUT") {
+            let payload;
 
-    return json({ error: "Method Not Allowed" }, 405);
+            try {
+                payload = await request.json();
+            } catch (error) {
+                return json({ error: "Invalid JSON body." }, 400);
+            }
+
+            const state = sanitizeStateSnapshot(payload?.state || payload);
+            const events = sanitizeSyncEvents(payload?.events);
+
+            await writeStateToSpreadsheet(sheets, spreadsheetId, state);
+            if (events.length) {
+                await appendActivityEvents(sheets, spreadsheetId, events);
+            }
+
+            return json({ state }, 200);
+        }
+
+        return json({ error: "Method Not Allowed" }, 405);
+    } catch (error) {
+        const status = error?.code === 403 ? 403 : 500;
+        return json(
+            {
+                error: error?.message || "Google Sheets request failed."
+            },
+            status
+        );
+    }
 }
 
-async function readStateFromBlob() {
-    const result = await get(STATE_PATHNAME, {
-        access: "private"
+function getMissingEnvVars() {
+    const requiredEnvVars = [
+        "GOOGLE_SHEETS_SPREADSHEET_ID",
+        "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+        "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY"
+    ];
+
+    return requiredEnvVars.filter((envName) => !process.env[envName]);
+}
+
+function createSheetsClient() {
+    const privateKey = String(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+    const auth = new google.auth.GoogleAuth({
+        credentials: {
+            client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            private_key: privateKey
+        },
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"]
     });
 
-    if (!result || result.statusCode !== 200 || !result.stream) {
-        return {
-            state: createEmptyState(),
-            etag: ""
-        };
-    }
-
-    const rawText = await new Response(result.stream).text();
-
-    return {
-        state: sanitizeStateSnapshot(parseJSON(rawText)),
-        etag: result.blob?.etag || ""
-    };
+    return google.sheets({
+        version: "v4",
+        auth
+    });
 }
 
-async function saveStateToBlob(incomingState, attempt = 0) {
-    const current = await readStateFromBlob();
+async function ensureSheetsExist(sheets, spreadsheetId) {
+    const existing = await sheets.spreadsheets.get({
+        spreadsheetId,
+        fields: "sheets.properties.title"
+    });
 
-    if (current.state.updatedAt > incomingState.updatedAt) {
-        return current.state;
+    const existingTitles = new Set(
+        (existing.data.sheets || []).map((sheet) => sheet.properties?.title).filter(Boolean)
+    );
+    const missingTitles = Object.values(SHEET_NAMES).filter((title) => !existingTitles.has(title));
+
+    if (missingTitles.length) {
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: missingTitles.map((title) => ({
+                    addSheet: {
+                        properties: {
+                            title
+                        }
+                    }
+                }))
+            }
+        });
+    }
+}
+
+async function readStateFromSpreadsheet(sheets, spreadsheetId) {
+    const response = await sheets.spreadsheets.values.batchGet({
+        spreadsheetId,
+        ranges: [
+            `${SHEET_NAMES.state}!A:B`,
+            `${SHEET_NAMES.tasks}!A:G`,
+            `${SHEET_NAMES.history}!A:D`
+        ]
+    });
+
+    const valueRanges = response.data.valueRanges || [];
+    const stateRows = valueRanges[0]?.values || [];
+    const taskRows = valueRanges[1]?.values || [];
+    const historyRows = valueRanges[2]?.values || [];
+    const stateMap = rowsToMap(stateRows);
+
+    return sanitizeStateSnapshot({
+        updatedAt: stateMap.updatedAt,
+        level: stateMap.level,
+        xp: stateMap.xp,
+        streak: stateMap.streak,
+        tasks: parseTaskRows(taskRows),
+        history: parseHistoryRows(historyRows)
+    });
+}
+
+async function writeStateToSpreadsheet(sheets, spreadsheetId, state) {
+    await Promise.all([
+        sheets.spreadsheets.values.clear({
+            spreadsheetId,
+            range: `${SHEET_NAMES.state}!A:B`
+        }),
+        sheets.spreadsheets.values.clear({
+            spreadsheetId,
+            range: `${SHEET_NAMES.tasks}!A:G`
+        }),
+        sheets.spreadsheets.values.clear({
+            spreadsheetId,
+            range: `${SHEET_NAMES.history}!A:D`
+        })
+    ]);
+
+    const stateRows = [
+        ...HEADERS[SHEET_NAMES.state],
+        ["updatedAt", String(state.updatedAt)],
+        ["level", String(state.level)],
+        ["xp", String(state.xp)],
+        ["streak", String(state.streak)],
+        ["taskCount", String(state.tasks.length)],
+        ["historyCount", String(state.history.length)]
+    ];
+    const taskRows = [
+        ...HEADERS[SHEET_NAMES.tasks],
+        ...state.tasks.map((task) => [
+            task.id,
+            task.name,
+            task.category,
+            task.repeatType,
+            task.targetPerWeek == null ? "" : String(task.targetPerWeek),
+            JSON.stringify(task.scheduledDays || []),
+            JSON.stringify(task.completedDates || [])
+        ])
+    ];
+    const historyRows = [
+        ...HEADERS[SHEET_NAMES.history],
+        ...state.history.map((entry) => [
+            entry.date,
+            String(entry.tasksCompleted),
+            String(entry.xpEarned),
+            JSON.stringify(entry.completedTasks || [])
+        ])
+    ];
+
+    await Promise.all([
+        sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${SHEET_NAMES.state}!A1:B${stateRows.length}`,
+            valueInputOption: "RAW",
+            requestBody: {
+                values: stateRows
+            }
+        }),
+        sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${SHEET_NAMES.tasks}!A1:G${taskRows.length}`,
+            valueInputOption: "RAW",
+            requestBody: {
+                values: taskRows
+            }
+        }),
+        sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `${SHEET_NAMES.history}!A1:D${historyRows.length}`,
+            valueInputOption: "RAW",
+            requestBody: {
+                values: historyRows
+            }
+        })
+    ]);
+}
+
+async function appendActivityEvents(sheets, spreadsheetId, events) {
+    await ensureActivityHeader(sheets, spreadsheetId);
+
+    await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${SHEET_NAMES.activity}!A:J`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: {
+            values: events.map((event) => [
+                event.timestamp,
+                event.eventType,
+                event.taskName,
+                event.category,
+                event.remark,
+                String(event.xpDelta),
+                String(event.currentLevel),
+                String(event.currentXp),
+                String(event.currentStreak),
+                JSON.stringify(event.details || {})
+            ])
+        }
+    });
+}
+
+async function ensureActivityHeader(sheets, spreadsheetId) {
+    const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${SHEET_NAMES.activity}!A1:J1`
+    });
+
+    const firstRow = response.data.values || [];
+    if (firstRow.length) {
+        return;
     }
 
-    try {
-        const writeResult = await put(STATE_PATHNAME, JSON.stringify(incomingState), {
-            access: "private",
-            allowOverwrite: true,
-            contentType: "application/json; charset=utf-8",
-            cacheControlMaxAge: 60,
-            ifMatch: current.etag || undefined
-        });
-
-        return {
-            ...incomingState,
-            updatedAt: Math.max(incomingState.updatedAt, Date.now()),
-            etag: writeResult.etag
-        };
-    } catch (error) {
-        if (error instanceof BlobPreconditionFailedError && attempt < 3) {
-            return saveStateToBlob(incomingState, attempt + 1);
+    await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${SHEET_NAMES.activity}!A1:J1`,
+        valueInputOption: "RAW",
+        requestBody: {
+            values: HEADERS[SHEET_NAMES.activity]
         }
+    });
+}
 
-        throw error;
+function rowsToMap(rows) {
+    return rows.slice(1).reduce((result, row) => {
+        const key = row?.[0];
+        if (key) {
+            result[key] = row?.[1] || "";
+        }
+        return result;
+    }, {});
+}
+
+function parseTaskRows(rows) {
+    return rows.slice(1).map((row) => ({
+        id: row[0] || "",
+        name: row[1] || "",
+        category: row[2] || "",
+        repeatType: row[3] || "",
+        targetPerWeek: row[4] === "" ? null : row[4],
+        scheduledDays: parseJSON(row[5], []),
+        completedDates: parseJSON(row[6], [])
+    }));
+}
+
+function parseHistoryRows(rows) {
+    return rows.slice(1).map((row) => ({
+        date: row[0] || "",
+        tasksCompleted: row[1] || 0,
+        xpEarned: row[2] || 0,
+        completedTasks: parseJSON(row[3], [])
+    }));
+}
+
+function parseJSON(value, fallbackValue) {
+    try {
+        return value ? JSON.parse(value) : fallbackValue;
+    } catch (error) {
+        return fallbackValue;
     }
 }
 
@@ -100,14 +341,6 @@ function json(payload, status) {
             "Content-Type": "application/json; charset=utf-8"
         }
     });
-}
-
-function parseJSON(value) {
-    try {
-        return JSON.parse(value);
-    } catch (error) {
-        return null;
-    }
 }
 
 function createEmptyState() {
@@ -131,6 +364,11 @@ function sanitizeText(value, maxLength = 240) {
 function sanitizeTimestamp(value) {
     const parsedValue = Math.floor(Number(value) || 0);
     return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 0;
+}
+
+function normalizeTimestampToIso(value) {
+    const parsedDate = new Date(value);
+    return Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
 }
 
 function isValidDateKey(value) {
@@ -221,6 +459,37 @@ function sanitizeHistoryEntry(entry) {
         ),
         completedTasks
     };
+}
+
+function sanitizeSyncEvents(events) {
+    if (!Array.isArray(events)) {
+        return [];
+    }
+
+    return events.reduce((result, event) => {
+        if (!event || typeof event !== "object") {
+            return result;
+        }
+
+        const eventType = sanitizeText(event.eventType, 60);
+        if (!eventType) {
+            return result;
+        }
+
+        result.push({
+            timestamp: normalizeTimestampToIso(event.timestamp),
+            eventType,
+            taskName: sanitizeText(event.taskName, 80),
+            category: CATEGORY_KEYS.has(event.category) ? event.category : "",
+            remark: sanitizeText(event.remark, 220),
+            xpDelta: Math.max(0, Math.floor(Number(event.xpDelta) || 0)),
+            currentLevel: clampNumber(event.currentLevel, 1, MAX_LEVEL),
+            currentXp: Math.max(0, Math.floor(Number(event.currentXp) || 0)),
+            currentStreak: Math.max(0, Math.floor(Number(event.currentStreak) || 0)),
+            details: event.details && typeof event.details === "object" ? event.details : {}
+        });
+        return result;
+    }, []);
 }
 
 function sanitizeStateSnapshot(snapshot) {
