@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rankion | Gamified Productivity</title>
+    <meta name="description" content="Rankion is a gamified productivity app with weekday-based recurring tasks, XP, streaks, spaced revisions, and progress stats.">
+    <script>
+        try {
+            const unlockUntil = Number(localStorage.getItem("rankion_unlock_until") || 0);
+            if (!(Date.now() < unlockUntil)) {
+                document.documentElement.classList.add("app-locked");
+            }
+        } catch (error) {
+            document.documentElement.classList.add("app-locked");
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="noise-overlay" aria-hidden="true"></div>
+
+    <div class="lock-overlay" id="lockOverlay" aria-hidden="true">
+        <div class="lock-card">
+            <p class="eyebrow">Private Access</p>
+            <h1>Enter passcode to open Rankion</h1>
+            <p class="lock-copy">
+                This device stays unlocked for 24 hours after the correct passcode is entered.
+            </p>
+
+            <form class="lock-form" id="passcodeForm">
+                <label class="field" for="passcodeInput">
+                    <span>Passcode</span>
+                    <input
+                        type="password"
+                        id="passcodeInput"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        maxlength="4"
+                        placeholder="Enter passcode"
+                        required
+                    >
+                </label>
+                <button type="submit" class="primary-button">Unlock Rankion</button>
+            </form>
+
+            <p class="lock-feedback" id="passcodeFeedback">Enter the passcode to continue.</p>
+        </div>
+    </div>
+
+    <div class="page-shell" id="pageShell">
+        <header class="topbar" id="topbar">
+            <div class="topbar-main">
+                <a href="#/dashboard" class="brand" data-nav="dashboard">
+                    <span class="brand-mark">Rankion</span>
+                    <span class="brand-copy">Productivity with momentum</span>
+                </a>
+
+                <div class="topbar-actions">
+                    <button type="button" class="sync-btn" id="supabaseStatusBtn" title="Supabase Database Connection & Migration">
+                        <span class="sync-dot local" id="syncDot"></span>
+                        <span id="syncLabel">Local Storage</span>
+                    </button>
+                    <div class="level-chip" id="levelBadge">Beginner's Arc</div>
+                </div>
+            </div>
+
+            <nav class="app-nav" id="appNav" aria-label="Main Navigation">
+                <a href="#/dashboard" class="nav-item is-active" data-view="dashboard">
+                    <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#/tasks" class="nav-item" data-view="tasks">
+                    <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                    <span>Tasks</span>
+                </a>
+                <a href="#/calendar" class="nav-item" data-view="calendar">
+                    <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>Calendar</span>
+                </a>
+                <a href="#/revision" class="nav-item" data-view="revision">
+                    <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                    <span>Revision</span>
+                    <span class="nav-badge" id="navRevBadge" style="display:none;">0</span>
+                </a>
+                <a href="#/stats" class="nav-item" data-view="stats">
+                    <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <span>Stats</span>
+                </a>
+                <a href="#/rewards" class="nav-item" data-view="rewards">
+                    <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+                    <span>Rewards</span>
+                </a>
+                <a href="#/settings" class="nav-item" data-view="settings">
+                    <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Settings</span>
+                </a>
+            </nav>
+        </header>
+
+        <main class="app-main-content">
+            <!-- =========================================================
+                 VIEW 1: DASHBOARD
+                 ========================================================= -->
+            <section class="view-page is-active" id="view-dashboard" data-view="dashboard">
+                <div class="hero section" id="home">
+                    <div class="hero-atmosphere" aria-hidden="true">
+                        <div class="glow glow-one"></div>
+                        <div class="glow glow-two"></div>
+                        <div class="grid-fade"></div>
+                    </div>
+
+                    <div class="hero-copy-block">
+                        <p class="eyebrow">Gamified Productivity</p>
+                        <h1>Build ranked habits that actually stick.</h1>
+                        <p class="hero-copy">
+                            Plan recurring tasks by weekday, complete them once per day, earn XP, hit weekly goals, and track your active spaced revisions with zero friction.
+                        </p>
+
+                        <div class="hero-actions">
+                            <a class="primary-button" href="#/tasks">Go to Tasks</a>
+                            <a class="secondary-button" href="#/calendar">Calendar</a>
+                            <a class="secondary-button" href="#/revision">Spaced Revision</a>
+                            <a class="secondary-button" href="#/stats">Analytics</a>
+                        </div>
+
+                        <div class="hero-meta">
+                            <article class="meta-card">
+                                <span class="meta-label">Today</span>
+                                <strong class="meta-value" id="todayLabel">Monday</strong>
+                            </article>
+                            <article class="meta-card">
+                                <span class="meta-label">Current streak</span>
+                                <strong class="meta-value" id="heroStreak">0 days</strong>
+                            </article>
+                            <article class="meta-card">
+                                <span class="meta-label">Focus</span>
+                                <strong class="meta-value" id="heroFocus">No tasks yet</strong>
+                            </article>
+                            <article class="meta-card">
+                                <span class="meta-label">Reward points</span>
+                                <strong class="meta-value" id="heroPoints">0 pts</strong>
+                            </article>
+                        </div>
+
+                        <section class="xp-panel">
+                            <div class="xp-row">
+                                <span id="xpSummary">0 / 100 XP</span>
+                                <span id="xpRemaining">100 XP to next arc step</span>
+                            </div>
+                            <div class="progress-track" aria-label="XP progress">
+                                <div class="progress-fill" id="xpProgressBar"></div>
+                            </div>
+                            <div class="xp-rank-row">
+                                <span id="currentRank">Rank: Beginner</span>
+                                <span id="nextRank">Next rank: D01 Hunter at arc step 15</span>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <div class="dashboard-widgets-grid section">
+                    <article class="panel insights-panel">
+                        <div class="section-head">
+                            <div>
+                                <p class="eyebrow">Momentum</p>
+                                <h2>Stay in motion</h2>
+                            </div>
+                        </div>
+
+                        <div class="motivation-card">
+                            <span class="motivation-tag">Streak Message</span>
+                            <p id="motivationMessage">Start with one task today and let the streak grow from there.</p>
+                        </div>
+
+                        <div class="daily-line-card">
+                            <div class="daily-line-head">
+                                <span class="motivation-tag">Daily Line</span>
+                                <span class="daily-line-date" id="dailyLineDate">Today</span>
+                            </div>
+                            <p class="daily-line-text" id="dailyLineText">Small progress done every day becomes momentum you can trust.</p>
+                        </div>
+
+                        <div class="mini-stats">
+                            <article class="mini-stat-card">
+                                <span>Today's completions</span>
+                                <strong id="todayCompletedCount">0</strong>
+                            </article>
+                            <article class="mini-stat-card">
+                                <span>Today's XP</span>
+                                <strong id="todayXpCount">0</strong>
+                            </article>
+                            <article class="mini-stat-card">
+                                <span>Weekly goals hit</span>
+                                <strong id="weeklyGoalsHit">0</strong>
+                            </article>
+                        </div>
+                    </article>
+
+                    <article class="panel quick-nav-panel">
+                        <div class="section-head">
+                            <div>
+                                <p class="eyebrow">Quick Navigation</p>
+                                <h2>Feature Hub</h2>
+                            </div>
+                        </div>
+
+                        <div class="quick-nav-grid">
+                            <a href="#/tasks" class="quick-nav-card">
+                                <div class="quick-nav-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                                </div>
+                                <div>
+                                    <strong>Task Board & Quests</strong>
+                                    <p>Manage daily habits and complete scheduled quests.</p>
+                                </div>
+                            </a>
+
+                            <a href="#/calendar" class="quick-nav-card">
+                                <div class="quick-nav-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                </div>
+                                <div>
+                                    <strong>Interactive Calendar</strong>
+                                    <p>Month, Week, Day, and Agenda timeline of events.</p>
+                                </div>
+                            </a>
+
+                            <a href="#/revision" class="quick-nav-card">
+                                <div class="quick-nav-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                                </div>
+                                <div>
+                                    <strong>Active Spaced Revision</strong>
+                                    <p>8-step memory curve (Day 0, 3, 7, 14, 30, 60, 120, 240).</p>
+                                </div>
+                            </a>
+
+                            <a href="#/stats" class="quick-nav-card">
+                                <div class="quick-nav-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                                </div>
+                                <div>
+                                    <strong>Analytics & Logbook</strong>
+                                    <p>Weekly category trends and complete historical logs.</p>
+                                </div>
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 VIEW 2: TASKS & QUEST PLANNER
+                 ========================================================= -->
+            <section class="view-page" id="view-tasks" data-view="tasks">
+                <div class="page-header-row">
+                    <div>
+                        <p class="eyebrow">Task Management</p>
+                        <h1 class="page-title">Task Board & Planner</h1>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <button type="button" class="secondary-button" id="openBulkImportBtn">+ Bulk Import</button>
+                    </div>
+                </div>
+
+                <div class="app-grid section">
+                    <!-- Task Board -->
+                    <section class="panel tasks-panel" id="tasks">
+                        <div class="section-head">
+                            <div>
+                                <p class="eyebrow">Task Board</p>
+                                <h2 id="taskBoardTitle">Monday Tasks</h2>
+                            </div>
+                            <p class="section-note" id="taskBoardHint">Only the current day's tasks can be completed.</p>
+                        </div>
+
+                        <div class="day-tabs" id="dayTabs" aria-label="Task categories by weekday"></div>
+                        <div class="task-list" id="taskList" aria-live="polite"></div>
+                    </section>
+
+                    <!-- Planner Form -->
+                    <section class="panel planner-panel" id="planner">
+                        <div class="section-head">
+                            <div>
+                                <p class="eyebrow">Task Setup</p>
+                                <h2>Create your next quest</h2>
+                            </div>
+                        </div>
+
+                        <form class="task-form" id="taskForm">
+                            <label class="field">
+                                <span>Task name</span>
+                                <input type="text" id="taskName" name="taskName" maxlength="80" placeholder="Example: Deep work session" required>
+                            </label>
+
+                            <div class="field-grid">
+                                <label class="field">
+                                    <span>Repeat type</span>
+                                    <select id="repeatType" name="repeatType">
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                    </select>
+                                </label>
+
+                                <label class="field">
+                                    <span>Category</span>
+                                    <select id="taskCategory" name="taskCategory">
+                                        <option value="physique">Physique</option>
+                                        <option value="earnings">Earnings</option>
+                                        <option value="intelligence">Intelligence</option>
+                                    </select>
+                                </label>
+
+                                <label class="field" id="weeklyTargetField">
+                                    <span>Target per week</span>
+                                    <input type="number" id="targetPerWeek" name="targetPerWeek" min="1" max="7" value="3">
+                                </label>
+
+                                <label class="field">
+                                    <span>Reward points</span>
+                                    <input type="number" id="taskRewardPoints" name="taskRewardPoints" min="1" max="999" value="10" required>
+                                </label>
+
+                                <label class="field">
+                                    <span>Streak boost %</span>
+                                    <input type="number" id="taskStreakBoost" name="taskStreakBoost" min="0" max="100" value="10" required>
+                                </label>
+                            </div>
+
+                            <div class="field">
+                                <span>Repeat on</span>
+                                <div class="day-selector" id="daySelector" role="group" aria-label="Select weekdays">
+                                    <button type="button" class="day-toggle" data-day="Monday" aria-pressed="false">Mon</button>
+                                    <button type="button" class="day-toggle" data-day="Tuesday" aria-pressed="false">Tue</button>
+                                    <button type="button" class="day-toggle" data-day="Wednesday" aria-pressed="false">Wed</button>
+                                    <button type="button" class="day-toggle" data-day="Thursday" aria-pressed="false">Thu</button>
+                                    <button type="button" class="day-toggle" data-day="Friday" aria-pressed="false">Fri</button>
+                                    <button type="button" class="day-toggle" data-day="Saturday" aria-pressed="false">Sat</button>
+                                    <button type="button" class="day-toggle" data-day="Sunday" aria-pressed="false">Sun</button>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="primary-button submit-button" id="taskSubmitButton">Add Task</button>
+                                <button type="button" class="ghost-button" id="taskCancelEditBtn" hidden>Cancel Edit</button>
+                            </div>
+                        </form>
+
+                        <p class="panel-footnote">
+                            Tasks earn base XP and reward points. Consecutive scheduled completions boost both by the streak boost percent.
+                        </p>
+                    </section>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 VIEW 3: INTERACTIVE CALENDAR
+                 ========================================================= -->
+            <section class="view-page" id="view-calendar" data-view="calendar">
+                <div class="panel calendar-panel section" id="calendar">
+                    <div class="calendar-head-row">
+                        <div>
+                            <p class="eyebrow">Timeline & Schedule</p>
+                            <div class="calendar-title-wrap">
+                                <h1 class="calendar-current-label" id="calendarMonthLabel">September 2026</h1>
+                            </div>
+                        </div>
+
+                        <div class="calendar-controls">
+                            <div class="cal-nav-group">
+                                <button type="button" class="cal-nav-btn" id="calPrevBtn" title="Previous">&lt;</button>
+                                <button type="button" class="cal-nav-btn cal-today-btn" id="calTodayBtn">Today</button>
+                                <button type="button" class="cal-nav-btn" id="calNextBtn" title="Next">&gt;</button>
+                            </div>
+
+                            <div class="cal-view-selector" role="group" aria-label="Calendar view switcher">
+                                <button type="button" class="cal-view-btn is-active" data-cal-view="month" id="viewMonthBtn">Month</button>
+                                <button type="button" class="cal-view-btn" data-cal-view="week" id="viewWeekBtn">Week</button>
+                                <button type="button" class="cal-view-btn" data-cal-view="day" id="viewDayBtn">Day</button>
+                                <button type="button" class="cal-view-btn" data-cal-view="agenda" id="viewAgendaBtn">Agenda</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="calendar-filter-bar">
+                        <div class="cal-filter-pills" id="calendarFilterPills">
+                            <button type="button" class="cal-filter-pill is-active" data-filter="all">All Events</button>
+                            <button type="button" class="cal-filter-pill" data-filter="revisions">Revisions</button>
+                            <button type="button" class="cal-filter-pill" data-filter="tasks">Tasks</button>
+                            <button type="button" class="cal-filter-pill" data-filter="sessions">Study Sessions</button>
+                        </div>
+
+                        <div class="cal-jump-wrap">
+                            <label for="calJumpDate" class="section-note">Jump to date:</label>
+                            <input type="date" id="calJumpDate" class="cal-jump-input">
+                        </div>
+                    </div>
+
+                    <div id="calendarViewContainer"></div>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 VIEW 4: SPACED REVISION & ACTIVE RECALL
+                 ========================================================= -->
+            <section class="view-page" id="view-revision" data-view="revision">
+                <div class="panel revision-panel section" id="revision">
+                    <div class="section-head">
+                        <div>
+                            <p class="eyebrow">Spaced Repetition & Retention</p>
+                            <h1 class="page-title">Active Recall System</h1>
+                        </div>
+                        <p class="section-note">Learning items automatically follow the fixed 8-step spaced cycle: Day 0, 3, 7, 14, 30, 60, 120, 240.</p>
+                    </div>
+
+                    <div class="revision-overview-grid">
+                        <article class="revision-metric-card is-due">
+                            <span>Due today</span>
+                            <strong id="revMetricDueToday">0</strong>
+                        </article>
+                        <article class="revision-metric-card is-overdue">
+                            <span>Overdue</span>
+                            <strong id="revMetricOverdue">0</strong>
+                        </article>
+                        <article class="revision-metric-card is-completed">
+                            <span>Completed</span>
+                            <strong id="revMetricCompleted">0</strong>
+                        </article>
+                        <article class="revision-metric-card">
+                            <span>Avg recall score</span>
+                            <strong id="revMetricAvgScore">--</strong>
+                        </article>
+                    </div>
+
+                    <div class="revision-action-bar">
+                        <div class="revision-nav-tabs" id="revisionNavTabs" role="tablist">
+                            <button type="button" class="rev-tab is-active" data-rev-tab="due">
+                                Due Today <span class="rev-tab-badge" id="badgeDueCount">0</span>
+                            </button>
+                            <button type="button" class="rev-tab" data-rev-tab="overdue">
+                                Overdue <span class="rev-tab-badge" id="badgeOverdueCount">0</span>
+                            </button>
+                            <button type="button" class="rev-tab" data-rev-tab="upcoming">
+                                Upcoming <span class="rev-tab-badge" id="badgeUpcomingCount">0</span>
+                            </button>
+                            <button type="button" class="rev-tab" data-rev-tab="completed">
+                                Completed <span class="rev-tab-badge" id="badgeCompletedCount">0</span>
+                            </button>
+                            <button type="button" class="rev-tab" data-rev-tab="library">
+                                Learning Library <span class="rev-tab-badge" id="badgeLibraryCount">0</span>
+                            </button>
+                        </div>
+
+                        <div class="hero-actions" style="margin-top:0;">
+                            <button type="button" class="secondary-button" id="openStudySessionModalBtn">+ Log Session</button>
+                            <button type="button" class="primary-button" id="openLearningItemModalBtn">+ New Learning Item</button>
+                        </div>
+                    </div>
+
+                    <div class="revision-queue-grid" id="revisionQueueList" aria-live="polite"></div>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 VIEW 5: STATS & ANALYTICS
+                 ========================================================= -->
+            <section class="view-page" id="view-stats" data-view="stats">
+                <div class="panel dashboard-panel section" id="stats">
+                    <div class="section-head stats-head">
+                        <div>
+                            <p class="eyebrow">Stats Dashboard</p>
+                            <h1 class="page-title">Progress & Analytics</h1>
+                        </div>
+
+                        <label class="select-wrap" for="statsFilter">
+                            <span>Range</span>
+                            <select id="statsFilter">
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="all">All Time</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="stats-grid">
+                        <article class="stat-card">
+                            <span>Total tasks completed</span>
+                            <strong id="statTasksCompleted">0</strong>
+                        </article>
+                        <article class="stat-card">
+                            <span>Total XP earned</span>
+                            <strong id="statXpEarned">0</strong>
+                        </article>
+                        <article class="stat-card">
+                            <span>Current arc</span>
+                            <strong id="statCurrentLevel">1</strong>
+                        </article>
+                        <article class="stat-card">
+                            <span>Current streak</span>
+                            <strong id="statCurrentStreak">0 days</strong>
+                        </article>
+                    </div>
+
+                    <div class="category-summary-grid" id="categorySummaryGrid"></div>
+
+                    <section class="chart-shell">
+                        <div class="chart-head">
+                            <div>
+                                <h3 id="chartTitle">Last 7 days</h3>
+                                <p id="chartSummary">Track completions and XP over time.</p>
+                            </div>
+                            <div class="chart-legend">
+                                <span class="legend-item">
+                                    <span class="legend-dot legend-dot-tasks"></span>
+                                    Tasks
+                                </span>
+                                <span class="legend-item">
+                                    <span class="legend-dot legend-dot-xp"></span>
+                                    XP
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="chart-scroll">
+                            <div class="chart-bars" id="chartBars"></div>
+                        </div>
+                    </section>
+
+                    <section class="chart-shell category-chart-shell">
+                        <div class="chart-head">
+                            <div>
+                                <h3 id="categoryChartTitle">Category focus by week</h3>
+                                <p id="categoryChartSummary">Track which category received the most completed work.</p>
+                            </div>
+                            <div class="chart-legend category-legend">
+                                <span class="legend-item">
+                                    <span class="legend-dot legend-dot-physique"></span>
+                                    Physique
+                                </span>
+                                <span class="legend-item">
+                                    <span class="legend-dot legend-dot-earnings"></span>
+                                    Earnings
+                                </span>
+                                <span class="legend-item">
+                                    <span class="legend-dot legend-dot-intelligence"></span>
+                                    Intelligence
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="category-line-chart" id="categoryLineChart"></div>
+                    </section>
+
+                    <section class="table-shell">
+                        <div class="table-head">
+                            <div>
+                                <h3>Weekly category table</h3>
+                                <p>See which week had the strongest focus in each category.</p>
+                            </div>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>Week</th>
+                                        <th>Physique</th>
+                                        <th>Earnings</th>
+                                        <th>Intelligence</th>
+                                        <th>Top Focus</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="weeklyCategoryTableBody"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="logbook-section" style="margin-top:28px;">
+                        <div class="section-head">
+                            <div>
+                                <p class="eyebrow">Logbook</p>
+                                <h2>Detailed completion log</h2>
+                            </div>
+                            <p class="section-note">This log follows the selected stats range and shows saved remarks for each completion.</p>
+                        </div>
+
+                        <div class="logbook-list" id="logbookList"></div>
+                    </section>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 VIEW 6: REWARDS STORE
+                 ========================================================= -->
+            <section class="view-page" id="view-rewards" data-view="rewards">
+                <div class="panel rewards-panel section" id="rewards">
+                    <div class="section-head">
+                        <div>
+                            <p class="eyebrow">Rewards Store</p>
+                            <h1 class="page-title">Spend Your Points</h1>
+                        </div>
+                        <p class="section-note">Add real-life rewards, then spend points when you earn them through discipline.</p>
+                    </div>
+
+                    <div class="reward-balance-card">
+                        <span class="meta-label">Available points</span>
+                        <strong id="rewardPointsBalance">0 pts</strong>
+                        <p>Points are earned from the reward value you set on each task. Redeeming a reward subtracts its point cost.</p>
+                    </div>
+
+                    <form class="reward-form" id="rewardForm">
+                        <label class="field">
+                            <span>Reward name</span>
+                            <input type="text" id="rewardName" maxlength="80" placeholder="Example: Free movie hour" required>
+                        </label>
+
+                        <label class="field">
+                            <span>Point cost</span>
+                            <input type="number" id="rewardCost" min="1" max="9999" value="50" required>
+                        </label>
+
+                        <button type="submit" class="primary-button submit-button">Add Reward</button>
+                    </form>
+
+                    <div class="reward-list" id="rewardList" aria-live="polite"></div>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 VIEW 7: SETTINGS & DANGER ZONE
+                 ========================================================= -->
+            <section class="view-page" id="view-settings" data-view="settings">
+                <div class="panel section" id="settings">
+                    <div class="section-head">
+                        <div>
+                            <p class="eyebrow">System & Preferences</p>
+                            <h1 class="page-title">Settings & Data Control</h1>
+                        </div>
+                        <p class="section-note">Manage cloud database synchronization, device authentication, and data lifecycle.</p>
+                    </div>
+
+                    <div class="settings-grid">
+                        <article class="settings-card">
+                            <div class="settings-card-head">
+                                <div class="settings-card-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+                                </div>
+                                <div>
+                                    <h3>Supabase Cloud Persistence</h3>
+                                    <p class="section-note">Permanent PostgreSQL database syncing across all sessions and devices.</p>
+                                </div>
+                            </div>
+                            <div class="settings-card-actions">
+                                <button type="button" class="primary-button" id="settingsSyncBtn">Open Cloud Sync Center</button>
+                            </div>
+                        </article>
+
+                        <article class="settings-card">
+                            <div class="settings-card-head">
+                                <div class="settings-card-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                </div>
+                                <div>
+                                    <h3>Access Gate Protection</h3>
+                                    <p class="section-note">Rankion auto-locks after 24 hours of inactivity. Passcode PIN is required to unlock.</p>
+                                </div>
+                            </div>
+                            <div class="settings-card-actions">
+                                <button type="button" class="secondary-button" id="lockNowBtn">Lock App Now</button>
+                            </div>
+                        </article>
+
+                        <article class="settings-card danger-card">
+                            <div class="settings-card-head">
+                                <div class="settings-card-icon danger-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                </div>
+                                <div>
+                                    <p class="eyebrow" style="color:var(--red);">Danger Zone</p>
+                                    <h3>Reset All App Data</h3>
+                                    <p class="section-note">Permanently wipe all local & cloud data (tasks, XP, streaks, revisions, rewards). Protected by PIN passcode.</p>
+                                </div>
+                            </div>
+                            <div class="settings-card-actions">
+                                <button type="button" class="ghost-button" id="resetDataBtn" style="color:var(--red); border-color:rgba(255,107,107,0.4);">Reset App Data</button>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- =========================================================
+         GLOBAL MODALS & OVERLAYS
+         ========================================================= -->
+    <!-- TASK COMPLETION MODAL -->
+    <div class="modal-overlay" id="completionModal" aria-hidden="true">
+        <div class="modal-card">
+            <p class="eyebrow">Task Completion</p>
+            <h3 id="completionTaskName">Complete task</h3>
+            <p class="modal-copy">Add an optional lesson name and remark to track your learning progress and spaced revisions.</p>
+
+            <form class="modal-form" id="completionForm">
+                <div class="modal-meta">
+                    <span class="task-tag" id="completionTaskCategory">Physique</span>
+                </div>
+
+                <div id="completionLessonField">
+                    <label class="field" for="completionLesson">
+                        <span>Lesson / Topic Name (Optional)</span>
+                        <input type="text" id="completionLesson" placeholder="e.g. Lesson 1: Calculus, Chapter 4, Trees, etc.">
+                    </label>
+                </div>
+
+                <label class="field" for="completionRemark">
+                    <span>Remark / Summary</span>
+                    <textarea id="completionRemark" rows="3" maxlength="220" placeholder="Example: Solved 15 problems, finished lecture 3, revised formulas"></textarea>
+                </label>
+
+                <div class="modal-actions">
+                    <button type="button" class="ghost-button" id="completionCancelBtn">Cancel</button>
+                    <button type="submit" class="primary-button">Save Completion</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="level-up-banner" id="levelUpBanner" aria-hidden="true">
+        <div class="level-up-card">
+            <p class="eyebrow">Arc Step Up</p>
+            <h3 id="levelUpText">Next arc step unlocked</h3>
+        </div>
+    </div>
+
+    <!-- ACTIVE RECALL REVISION MODAL -->
+    <div class="modal-overlay" id="activeRecallModal" aria-hidden="true">
+        <div class="modal-card modal-card-large">
+            <div class="recall-prompt-header">
+                <div class="modal-meta">
+                    <span class="status-badge due" id="recallRevisionBadge">Revision #1</span>
+                    <span class="task-tag" id="recallSubjectTag">Subject</span>
+                    <span class="task-tag" id="recallTopicTag">Topic</span>
+                </div>
+                <h3 id="recallItemTitle">Learning Item Title</h3>
+                <p class="section-note" id="recallLearningDate">Learned on Sept 4, 2026</p>
+            </div>
+
+            <div class="recall-active-box" id="recallStep1">
+                <div class="recall-prompt-banner">
+                    <strong>What do you remember?</strong>
+                    <p>Before revealing your saved notes and formulas, write down key concepts, equations, and facts you recall from memory.</p>
+                </div>
+
+                <label class="field" for="recallMemoryInput">
+                    <span>Your Memory Recall</span>
+                    <textarea id="recallMemoryInput" rows="5" placeholder="Write out everything you remember from memory..."></textarea>
+                </label>
+
+                <div class="modal-actions">
+                    <button type="button" class="ghost-button" id="recallCancelBtn">Cancel</button>
+                    <button type="button" class="primary-button" id="recallRevealBtn">Reveal Notes / Show Answer</button>
+                </div>
+            </div>
+
+            <div class="recall-reveal-section" id="recallStep2">
+                <div class="revealed-notes-card">
+                    <div class="note-block" id="revealWhatLearnedBlock">
+                        <strong>What Was Learned</strong>
+                        <p id="revealWhatLearnedText"></p>
+                    </div>
+                    <div class="note-block" id="revealKeyConceptsBlock">
+                        <strong>Key Concepts & Formulas</strong>
+                        <p id="revealKeyConceptsText"></p>
+                    </div>
+                    <div class="note-block" id="revealImportantPointsBlock">
+                        <strong>Important Points</strong>
+                        <p id="revealImportantPointsText"></p>
+                    </div>
+                    <div class="note-block" id="revealNotesBlock">
+                        <strong>Notes</strong>
+                        <p id="revealNotesText"></p>
+                    </div>
+                </div>
+
+                <div class="recall-rating-box">
+                    <span class="recall-rating-label">How well did you remember?</span>
+                    <div class="recall-score-grid" id="recallScoreGrid">
+                        <button type="button" class="score-btn" data-score="1">
+                            <span class="score-num">1</span>
+                            <span class="score-desc">Completely forgot</span>
+                        </button>
+                        <button type="button" class="score-btn" data-score="2">
+                            <span class="score-num">2</span>
+                            <span class="score-desc">Remembered very little</span>
+                        </button>
+                        <button type="button" class="score-btn is-selected" data-score="3">
+                            <span class="score-num">3</span>
+                            <span class="score-desc">Remembered some</span>
+                        </button>
+                        <button type="button" class="score-btn" data-score="4">
+                            <span class="score-num">4</span>
+                            <span class="score-desc">Remembered most</span>
+                        </button>
+                        <button type="button" class="score-btn" data-score="5">
+                            <span class="score-num">5</span>
+                            <span class="score-desc">Remembered very well</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="field-grid">
+                    <label class="field" for="recallConfidence">
+                        <span>Confidence Level</span>
+                        <select id="recallConfidence">
+                            <option value="Low">Low Confidence</option>
+                            <option value="Medium" selected>Medium Confidence</option>
+                            <option value="High">High Confidence</option>
+                        </select>
+                    </label>
+
+                    <label class="field" for="recallWhatForgot">
+                        <span>What I Forgot</span>
+                        <input type="text" id="recallWhatForgot" placeholder="Example: Forgotten quadratic sign rule">
+                    </label>
+                </div>
+
+                <label class="field" for="recallSessionNotes">
+                    <span>Revision Remarks / Follow-up Notes</span>
+                    <textarea id="recallSessionNotes" rows="2" placeholder="Optional notes on how you performed..."></textarea>
+                </label>
+
+                <div class="modal-actions">
+                    <button type="button" class="ghost-button" id="recallBackToPromptBtn">Back</button>
+                    <button type="submit" class="primary-button" id="recallSaveBtn">Save & Schedule Next Revision</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE/EDIT LEARNING ITEM & STUDY SESSION MODAL -->
+    <div class="modal-overlay" id="learningItemModal" aria-hidden="true">
+        <div class="modal-card modal-card-large">
+            <p class="eyebrow" id="learningItemModalEyebrow">Study & Spaced Repetition</p>
+            <h3 id="learningItemModalTitle">Create Learning Item</h3>
+            <p class="modal-copy">Create a specific learning unit with an automatic 8-step spaced repetition schedule.</p>
+
+            <form class="modal-form" id="learningItemForm">
+                <input type="hidden" id="learningItemId" value="">
+                
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Session Type</span>
+                        <select id="sessionTypeSelect">
+                            <option value="learning" selected>Learning Session (Generates Spaced Revisions)</option>
+                            <option value="normal">Normal Study Session (No Revisions)</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span>Learning Date</span>
+                        <input type="date" id="itemLearningDate" required>
+                    </label>
+                </div>
+
+                <label class="field">
+                    <span>Learning Item Title / Concept</span>
+                    <input type="text" id="itemTitle" placeholder="Example: Quadratic Equations & Roots" required>
+                </label>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Subject</span>
+                        <input type="text" id="itemSubject" placeholder="Example: Mathematics" required>
+                    </label>
+
+                    <label class="field">
+                        <span>Lesson / Topic</span>
+                        <input type="text" id="itemTopic" placeholder="Example: Algebra, Calculus, Lesson 1, etc." required>
+                    </label>
+
+                    <label class="field">
+                        <span>Subtopic (Optional)</span>
+                        <input type="text" id="itemSubtopic" placeholder="Example: Vertex form">
+                    </label>
+                </div>
+
+                <div id="learningFieldsContainer">
+                    <label class="field">
+                        <span>What I Learned (Core Summary)</span>
+                        <textarea id="itemWhatLearned" rows="3" placeholder="Summary of what was understood during this session..."></textarea>
+                    </label>
+
+                    <label class="field">
+                        <span>Key Concepts & Formulas / Facts</span>
+                        <textarea id="itemKeyConcepts" rows="3" placeholder="Formulas, key theorems, rules, and core definitions..."></textarea>
+                    </label>
+
+                    <label class="field">
+                        <span>Important Points & Gotchas</span>
+                        <textarea id="itemImportantPoints" rows="2" placeholder="Common pitfalls, tricks, and edge cases to remember..."></textarea>
+                    </label>
+
+                    <div class="field-grid">
+                        <label class="field">
+                            <span>Questions Attempted</span>
+                            <input type="number" id="itemQuestionsAttempted" min="0" value="0">
+                        </label>
+
+                        <label class="field">
+                            <span>Questions Correct</span>
+                            <input type="number" id="itemQuestionsCorrect" min="0" value="0">
+                        </label>
+
+                        <label class="field">
+                            <span>Initial Confidence</span>
+                            <select id="itemConfidence">
+                                <option value="1">1 - Very Low</option>
+                                <option value="2">2 - Low</option>
+                                <option value="3" selected>3 - Moderate</option>
+                                <option value="4">4 - High</option>
+                                <option value="5">5 - Mastered</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <label class="field">
+                    <span>Session Notes / Remarks</span>
+                    <textarea id="itemNotes" rows="2" placeholder="General session notes, duration, or resources used..."></textarea>
+                </label>
+
+                <div class="modal-actions">
+                    <button type="button" class="ghost-button" id="learningItemCancelBtn">Cancel</button>
+                    <button type="submit" class="primary-button" id="learningItemSubmitBtn">Save & Generate Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BULK IMPORT TASKS MODAL -->
+    <div class="modal-overlay" id="bulkImportModal" aria-hidden="true">
+        <div class="modal-card modal-card-large">
+            <p class="eyebrow">Quick Add</p>
+            <h3>Bulk Import Tasks</h3>
+            <p class="modal-copy">Paste multiple tasks to import them quickly. All details (category, days, points) are parsed directly from your data.</p>
+
+            <div class="bulk-format-guide">
+                <p><strong>Supported Formats:</strong></p>
+                <p>• <strong>Pipe Delimited:</strong> <code>Task Name | Category | Scheduled Days | Reward Points | Boost %</code><br>
+                <span class="section-note" style="font-size:0.75rem;">Example: <code>Morning Workout | Physique | Mon, Wed, Fri | 15</code></span></p>
+                <p>• <strong>Simple Format:</strong> One task name per line (e.g. <code>Solve 5 LeetCode Problems</code>)</p>
+                <p>• <strong>JSON Format:</strong> <code>[{"name": "...", "category": "...", "scheduledDays": [...]}]</code></p>
+            </div>
+
+            <form class="modal-form" id="bulkImportForm" style="margin-top:14px;">
+                <label class="field" for="bulkImportInput">
+                    <span>Task List (paste below)</span>
+                    <textarea id="bulkImportInput" rows="8" placeholder="Example:
+Morning Workout | Physique | Mon, Wed, Fri | 15
+Study Algorithms | Intelligence | Mon, Tue, Thu | 20
+Read 20 pages | Intelligence | Daily | 10
+Client Outreach | Earnings | Weekdays | 25" required></textarea>
+                </label>
+
+                <div class="bulk-preview-banner" id="bulkPreviewBanner">
+                    <span id="bulkParsedCountText">0 new tasks ready to import</span>
+                    <span id="bulkDuplicateNote" style="color:var(--muted-strong); font-size:0.8rem;">All tasks unique</span>
+                </div>
+
+                <div class="modal-actions" style="margin-top:16px;">
+                    <button type="button" class="ghost-button" id="bulkCancelBtn">Cancel</button>
+                    <button type="submit" class="primary-button" id="bulkSubmitBtn">Import Tasks</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SUPABASE CLOUD SYNC & MIGRATION MODAL -->
+    <div class="modal-overlay" id="supabaseModal" aria-hidden="true">
+        <div class="modal-card">
+            <p class="eyebrow">Cloud Database Storage</p>
+            <h3>Supabase Database</h3>
+            <p class="modal-copy">Your persistent cloud database is configured and active. All tasks, revisions, and study data sync automatically.</p>
+
+            <div class="supabase-status-banner" style="margin-top:18px;">
+                <span class="supabase-status-pill">
+                    <span class="sync-dot synced" id="modalSyncDot"></span>
+                    <strong id="modalSyncStatusText">Storage Mode: Cloud Synced</strong>
+                </span>
+            </div>
+
+            <div class="migration-banner" id="migrationCard" style="margin-top:18px;">
+                <strong>Cloud Data Sync & Migration</strong>
+                <p id="migrationSummaryText">Your local device data is synced directly to your Supabase PostgreSQL database.</p>
+                <div class="modal-actions" style="justify-content:flex-start; margin-top:12px;">
+                    <button type="button" class="primary-button" id="forceSyncBtn">Sync Now</button>
+                    <button type="button" class="secondary-button" id="startMigrationBtn">Migrate Local Cache</button>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top:20px;">
+                <button type="button" class="ghost-button" id="supabaseCloseBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESET DATA PIN CONFIRMATION MODAL -->
+    <div class="modal-overlay" id="resetConfirmModal" aria-hidden="true">
+        <div class="modal-card">
+            <p class="eyebrow" style="color:var(--red);">Security Verification</p>
+            <h3>Reset All Rankion Data</h3>
+            <p class="modal-copy">This action will permanently delete all tasks, streak, XP, rewards, and learning progress. Enter your 4-digit passcode PIN (<strong>2486</strong>) to proceed.</p>
+
+            <form class="modal-form" id="resetConfirmForm" style="margin-top:14px;">
+                <label class="field" for="resetPinInput">
+                    <span>Enter Passcode PIN</span>
+                    <input
+                        type="password"
+                        id="resetPinInput"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        maxlength="4"
+                        placeholder="Enter 4-digit PIN"
+                        required
+                    >
+                </label>
+                <p class="form-feedback error-feedback" id="resetPinFeedback" aria-live="polite" style="color:var(--red); font-size:0.85rem; margin:6px 0 0 0; min-height:1.2em;"></p>
+
+                <div class="modal-actions" style="margin-top:18px;">
+                    <button type="button" class="ghost-button" id="resetCancelBtn">Cancel</button>
+                    <button type="submit" class="primary-button" id="resetConfirmBtn" style="background:var(--red); border-color:var(--red); color:#ffffff;">Confirm & Reset Everything</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
