@@ -8,7 +8,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "https://YOUR_RENDER_BACKEND_URL.onrender.com/api/$1"
+      "dest": "https://rankion.onrender.com/api/$1"
     },
     {
       "src": "/(.*)",
