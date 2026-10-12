@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rankion</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       PASSCODE LOCK SCREEN (LOCK: 2486)
+       ======================================================================== -->
+  <div id="lock-screen">
+    <div class="lock-card">
+      <h1 style="margin-bottom: 24px; font-size: 26px; font-weight: 700;">Rankion</h1>
+      
+      <form id="lock-form" onsubmit="handleUnlockSubmit(event)">
+        <div class="lock-input-group">
+          <input type="password" id="passcode-input" maxlength="12" placeholder="••••" autocomplete="current-password" autofocus required>
+        </div>
+        <div class="lock-error" id="lock-error-msg"></div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Unlock</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MAIN APPLICATION SHELL
+       ======================================================================== -->
+  <div id="main-app" style="display: none;">
+    <!-- Desktop Sidebar / Mobile Drawer -->
+    <aside class="sidebar" id="app-sidebar">
+      <div class="sidebar-header">
+        <div class="brand-title">RANKION</div>
+        <span class="brand-badge">PREP PORTAL</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Core Navigation</div>
+        <a class="nav-item active" data-view="dashboard" onclick="navigateTo('dashboard')">
+          <span>Home / Dashboard</span>
+        </a>
+        <a class="nav-item" data-view="subjects" onclick="navigateTo('subjects')">
+          <span>My Subjects</span>
+          <span class="nav-badge" id="badge-subject-count">0</span>
+        </a>
+        <a class="nav-item" data-view="chapters" onclick="navigateTo('chapters')">
+          <span>Chapter Library</span>
+        </a>
+        <a class="nav-item" data-view="notes" onclick="navigateTo('notes')">
+          <span>My Notes</span>
+        </a>
+
+        <div class="nav-section-title">Active Learning</div>
+        <a class="nav-item" data-view="flashcards" onclick="navigateTo('flashcards')">
+          <span>Flashcards</span>
+          <span class="nav-badge danger" id="badge-due-flashcards" style="display:none;">0 Due</span>
+        </a>
+        <a class="nav-item" data-view="tests" onclick="navigateTo('tests')">
+          <span>Practice Tests</span>
+        </a>
+        <a class="nav-item" data-view="mistakes" onclick="navigateTo('mistakes')">
+          <span>Mistake Notebook</span>
+          <span class="nav-badge" id="badge-mistake-count">0</span>
+        </a>
+        <a class="nav-item" data-view="revision" onclick="navigateTo('revision')">
+          <span>Revision Schedule</span>
+        </a>
+        <a class="nav-item" data-view="pyqs" onclick="navigateTo('pyqs')">
+          <span>Authentic PYQs</span>
+        </a>
+
+        <div class="nav-section-title">Analysis & System</div>
+        <a class="nav-item" data-view="analytics" onclick="navigateTo('analytics')">
+          <span>Performance Analytics</span>
+        </a>
+        <a class="nav-item" data-view="settings" onclick="navigateTo('settings')">
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-secondary btn-sm" onclick="toggleTheme()" id="theme-toggle-btn">Dark Mode</button>
+        <button class="btn btn-secondary btn-sm" onclick="lockWebsite()">Lock</button>
+      </div>
+    </aside>
+
+    <!-- Main Viewport Wrapper -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" onclick="toggleMobileSidebar()">Menu</button>
+          <div>
+            <div class="page-breadcrumb" id="topbar-breadcrumb">Preparation Platform</div>
+            <div class="page-title" id="topbar-title">Dashboard</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal()">+ Paste Note</button>
+          <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Paste Flashcards</button>
+          <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Paste Questions</button>
+          <button class="btn btn-primary btn-sm" onclick="startDailyRevisionSession()">Revise Due Cards</button>
+        </div>
+      </header>
+
+      <main class="content-viewport">
+
+        <!-- ==================================================================
+             VIEW: DASHBOARD
+             ================================================================== -->
+        <section id="view-dashboard" class="app-view">
+          <!-- Algorithmic Study Action Recommendations -->
+          <div class="card" id="air1-recommendation-card" style="border-left: 4px solid var(--accent-primary);">
+            <div class="card-header" style="margin-bottom: 8px; padding-bottom: 8px;">
+              <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-primary);">
+                Daily Study Directives & Priority Recommendations
+              </div>
+              <span class="badge badge-blue">Grounded in Progress</span>
+            </div>
+            <div id="recommendations-container">
+              <div style="font-size: 13px; color: var(--text-muted);">Analyzing study data...</div>
+            </div>
+          </div>
+
+          <!-- Real Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">Subjects Created</div>
+              <div class="metric-val" id="metric-subjects">0</div>
+              <div class="metric-sub" id="metric-chapters-sub">0 Chapters Active</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Flashcards Due</div>
+              <div class="metric-val" style="color: var(--status-danger);" id="metric-due-cards">0</div>
+              <div class="metric-sub" id="metric-due-sub">0 Overdue • 0 Today</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Test Accuracy</div>
+              <div class="metric-val" id="metric-accuracy">0.0%</div>
+              <div class="metric-sub" id="metric-tests-sub">0 Completed Tests</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Unresolved Mistakes</div>
+              <div class="metric-val" style="color: var(--status-warning);" id="metric-mistakes">0</div>
+              <div class="metric-sub" id="metric-repeated-sub">0 Repeated Errors</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+            <!-- Chapter Progress Summary -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Chapter Preparation Status</div>
+                  <div class="card-desc">Real progress calculated from your notes, cards, and test accuracy.</div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="navigateTo('chapters')">Manage Chapters</button>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Subject / Chapter</th>
+                      <th>Status</th>
+                      <th>Notes</th>
+                      <th>Cards</th>
+                      <th>Accuracy</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-chapter-table">
+                    <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No chapters added yet. Create a subject to begin.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Today's Revision Queue -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Today's Priority Queue</div>
+                  <div class="card-desc">Prioritizes overdue cards & recurring mistakes.</div>
+                </div>
+              </div>
+              <div id="dashboard-queue-container" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px 0;">
+                  Loading queue...
+                </div>
+              </div>
+              <div style="margin-top: 16px;">
+                <button class="btn btn-primary" style="width: 100%;" onclick="startDailyRevisionSession()">
+                  Start Scheduled Revision
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: MY SUBJECTS
+             ================================================================== -->
+        <section id="view-subjects" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">My Subjects</div>
+                <div class="card-desc">You have full control over your curriculum. No hardcoded subjects.</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openSubjectModal()">+ Add Subject</button>
+            </div>
+            
+            <div id="subjects-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+              <!-- Dynamic Subjects Cards -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: CHAPTER LIBRARY
+             ================================================================== -->
+        <section id="view-chapters" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Chapter Library</div>
+                <div class="card-desc">Create chapters, manage optional topics, upload notes, and generate study sets.</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <select id="chapter-subject-filter" class="form-control" style="width: 200px;" onchange="filterChaptersBySubject()">
+                  <option value="">All Subjects</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="openChapterModal()">+ Add Chapter</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Chapter Name</th>
+                    <th>Topics</th>
+                    <th>Notes</th>
+                    <th>Flashcards</th>
+                    <th>Accuracy</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="chapters-table-body">
+                  <!-- Dynamic Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: MY NOTES
+             ================================================================== -->
+        <section id="view-notes" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">My Notes & Documents</div>
+                <div class="card-desc">Your personal study notes. Paste concepts, definitions, formulas, or Q&A directly.</div>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <select id="notes-chapter-filter" class="form-control" style="width: 180px;" onchange="loadNotesList()">
+                  <option value="">All Chapters</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal()">+ Paste Note</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Paste Flashcards</button>
+                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Paste Questions</button>
+                <button class="btn btn-secondary btn-sm" onclick="openNoteUploadModal()">Upload File</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Subject / Chapter</th>
+                    <th>Source Type</th>
+                    <th>Status</th>
+                    <th>Cards Generated</th>
+                    <th>Questions</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="notes-table-body">
+                  <!-- Dynamic Note Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: FLASHCARDS
+             ================================================================== -->
+        <section id="view-flashcards" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Flashcards Management</div>
+                <div class="card-desc">Active recall flashcards created from your questions and answers. Managed by SM-2 spaced repetition.</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <select id="flashcard-chapter-filter" class="form-control" style="width: 200px;" onchange="loadFlashcardsList()">
+                  <option value="">All Chapters</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Paste Flashcards (Q&A)</button>
+                <button class="btn btn-primary btn-sm" onclick="startDailyRevisionSession()">Revise Due Cards</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Question</th>
+                    <th>Answer Preview</th>
+                    <th>Subject / Chapter</th>
+                    <th>Interval</th>
+                    <th>Ease</th>
+                    <th>Due Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="flashcards-table-body">
+                  <!-- Dynamic Flashcard Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: PRACTICE TESTS
+             ================================================================== -->
+        <section id="view-tests" class="app-view" style="display: none;">
+          <!-- Card 1: Question Bank (Your Pasted MCQs) -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Practice Question Bank (MCQs)</div>
+                <div class="card-desc">Your pasted multiple-choice questions ready for testing. Filter by chapter or take an exam.</div>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <select id="tests-chapter-filter" class="form-control" style="width: 200px;" onchange="loadPracticeQuestionsList()">
+                  <option value="">All Chapters</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Paste Questions (MCQs)</button>
+                <button class="btn btn-primary btn-sm" onclick="openTestConfigModal()">+ Start Practice Test</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 40px;">#</th>
+                    <th style="min-width: 240px;">Question</th>
+                    <th style="min-width: 220px;">Options</th>
+                    <th>Correct Answer</th>
+                    <th>Subject / Chapter</th>
+                    <th>Difficulty</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="practice-questions-table-body">
+                  <!-- Pasted MCQs Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 2: Test Attempts & Examination History -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Completed Test History</div>
+                <div class="card-desc">Past test attempts, SSC scores (+2 / -0.5), and detailed solution reviews.</div>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Test Title</th>
+                    <th>Mode</th>
+                    <th>Questions</th>
+                    <th>Score</th>
+                    <th>Accuracy</th>
+                    <th>Time Taken</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tests-history-table-body">
+                  <!-- Past Test Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: MISTAKE NOTEBOOK
+             ================================================================== -->
+        <section id="view-mistakes" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Mistake Notebook</div>
+                <div class="card-desc">Every wrong answer from your tests is saved here. Classify error causes and add reflections.</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <select id="mistake-status-filter" class="form-control" style="width: 140px;" onchange="loadMistakesList()">
+                  <option value="">All Statuses</option>
+                  <option value="unresolved">Unresolved</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="mastered">Mastered</option>
+                </select>
+                <select id="mistake-type-filter" class="form-control" style="width: 180px;" onchange="loadMistakesList()">
+                  <option value="">All Error Types</option>
+                  <option value="Memory Failure">Memory Failure</option>
+                  <option value="Conceptual Misunderstanding">Conceptual Misunderstanding</option>
+                  <option value="Calculation Error">Calculation Error</option>
+                  <option value="Careless Mistake">Careless Mistake</option>
+                  <option value="Unclassified">Unclassified</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="mistakes-list-container" style="display: flex; flex-direction: column; gap: 14px;">
+              <!-- Dynamic Mistake Cards -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: REVISION SCHEDULE (SPACED REPETITION)
+             ================================================================== -->
+        <section id="view-revision" class="app-view" style="display: none;">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">Overdue Cards</div>
+              <div class="metric-val" style="color: var(--status-danger);" id="rev-overdue-val">0</div>
+              <div class="metric-sub">Immediate priority for recall</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Due Today</div>
+              <div class="metric-val" id="rev-today-val">0</div>
+              <div class="metric-sub">Scheduled by SM-2 for today</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Reviewed Today</div>
+              <div class="metric-val" style="color: var(--status-success);" id="rev-done-val">0</div>
+              <div class="metric-sub">Cards practiced today</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Daily Limit</div>
+              <div class="metric-val" id="rev-limit-val">50</div>
+              <div class="metric-sub">Configured in Settings</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Scheduled Review Queue</div>
+                <div class="card-desc">Calculated according to SuperMemo SM-2 algorithm based on past recall ratings.</div>
+              </div>
+              <button class="btn btn-primary" onclick="startDailyRevisionSession()">Start Interactive Revision</button>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Subject / Chapter</th>
+                    <th>Due Date</th>
+                    <th>Lapses</th>
+                    <th>Ease Factor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="revision-queue-table-body">
+                  <!-- Dynamic Scheduled Items -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: AUTHENTIC PYQS
+             ================================================================== -->
+        <section id="view-pyqs" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Authentic Previous Year Questions (PYQs)</div>
+                <div class="card-desc">Strictly verified questions from actual SSC CHSL examinations. Kept distinct from AI practice.</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openPYQModal()">+ Add Verified PYQ</button>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Exam & Year</th>
+                    <th>Subject / Chapter</th>
+                    <th>Question Text</th>
+                    <th>Options</th>
+                    <th>Correct Answer</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="pyqs-table-body">
+                  <!-- PYQ Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: PERFORMANCE ANALYTICS
+             ================================================================== -->
+        <section id="view-analytics" class="app-view" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Comprehensive Preparation Analytics</div>
+                <div class="card-desc">All statistics computed directly from your saved database records. No invented numbers.</div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 20px;">
+              <div class="card-title" style="margin-bottom: 12px;">7-Day Study Consistency Log</div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Flashcard Reviews</th>
+                      <th>Tests Attempted</th>
+                      <th>Total Study Interactions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analytics-consistency-table">
+                    <!-- Daily consistency logs -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card-title" style="margin-bottom: 12px;">Chapter Accuracy & Weak Area Diagnostics</div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Chapter</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Cards</th>
+                    <th>Due Cards</th>
+                    <th>Tests</th>
+                    <th>Accuracy %</th>
+                    <th>Active Mistakes</th>
+                  </tr>
+                </thead>
+                <tbody id="analytics-chapters-table">
+                  <!-- Analytics Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW: SETTINGS
+             ================================================================== -->
+        <section id="view-settings" class="app-view" style="display: none;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Revision & Study Preferences -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Study & Revision Targets</div>
+              </div>
+              <form id="settings-targets-form" onsubmit="handleSettingsUpdate(event)">
+                <div class="form-group">
+                  <label class="form-label">Daily Flashcard Revision Limit</label>
+                  <input type="number" id="setting-daily-rev-limit" class="form-control" min="10" max="300" required>
+                  <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Caps daily review burden to prevent burnout.</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Daily New Cards Limit</label>
+                  <input type="number" id="setting-daily-new-limit" class="form-control" min="5" max="100" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Daily Target Study Time (Minutes)</label>
+                  <input type="number" id="setting-target-minutes" class="form-control" min="30" max="720" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Targets</button>
+              </form>
+            </div>
+
+            <!-- Passcode & Security -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Security & Website Lock</div>
+              </div>
+              <form id="settings-passcode-form" onsubmit="handlePasscodeChange(event)">
+                <div class="form-group">
+                  <label class="form-label">Access Passcode (Currently: 2486)</label>
+                  <input type="text" id="setting-passcode" class="form-control" minlength="4" maxlength="12" required>
+                  <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Passcode required every time you access the website.</div>
+                </div>
+                <button type="submit" class="btn btn-secondary">Update Passcode</button>
+              </form>
+
+              <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
+                <div class="card-title" style="margin-bottom: 6px;">Appearance Theme</div>
+                <div style="display: flex; gap: 10px;">
+                  <button class="btn btn-secondary" onclick="setAppTheme('light')">Light Theme (Default)</button>
+                  <button class="btn btn-secondary" onclick="setAppTheme('dark')">Dark Theme</button>
+                </div>
+              </div>
+            </div>
+
+
+
+            <!-- Complete Database Backup & Restore -->
+            <div class="card" style="grid-column: span 2;">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Data Backup & Export</div>
+                  <div class="card-desc">Download a complete snapshot of all your subjects, notes, flashcards, test attempts, and mistake history.</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-secondary" onclick="exportDataBackup()">Download Complete JSON Backup</button>
+                <label class="btn btn-secondary" style="margin-bottom: 0; cursor: pointer;">
+                  Restore from JSON Backup
+                  <input type="file" id="backup-file-input" accept=".json" style="display: none;" onchange="handleRestoreBackup(event)">
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODALS & OVERLAYS
+       ======================================================================== -->
+
+  <!-- Subject Modal -->
+  <div class="modal-backdrop" id="modal-subject">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-subject-title">Add Subject</div>
+        <button class="modal-close" onclick="closeModal('modal-subject')">×</button>
+      </div>
+      <form id="form-subject" onsubmit="handleSubjectSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="subject-edit-id">
+          <div class="form-group">
+            <label class="form-label">Subject Name (e.g. Quantitative Aptitude, General Intelligence, English Language)</label>
+            <input type="text" id="subject-name" class="form-control" required placeholder="Enter subject name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description / Target Focus</label>
+            <input type="text" id="subject-desc" class="form-control" placeholder="e.g. SSC CHSL Tier 1 & 2 Syllabus">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-subject')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Subject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Chapter Modal -->
+  <div class="modal-backdrop" id="modal-chapter">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-chapter-title">Add Chapter</div>
+        <button class="modal-close" onclick="closeModal('modal-chapter')">×</button>
+      </div>
+      <form id="form-chapter" onsubmit="handleChapterSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="chapter-edit-id">
+          <div class="form-group">
+            <label class="form-label">Select Subject</label>
+            <select id="chapter-subject-select" class="form-control" required>
+              <!-- Dynamic Subjects -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Chapter Name (e.g. Number Systems, Percentage, Error Spotting)</label>
+            <input type="text" id="chapter-name" class="form-control" required placeholder="Enter chapter name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" id="chapter-desc" class="form-control" placeholder="Key concepts, weightage...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Preparation Status</label>
+            <select id="chapter-status" class="form-control">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Mastered">Mastered</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-chapter')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Chapter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Note Paste Modal -->
+  <div class="modal-backdrop" id="modal-note-paste">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title">Paste Study Notes</div>
+        <button class="modal-close" onclick="closeModal('modal-note-paste')">×</button>
+      </div>
+      <form id="form-note-paste" onsubmit="handleNotePasteSubmit(event)">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Subject</label>
+              <select id="paste-subject-select" class="form-control" onchange="populateChapterSelect('paste-subject-select', 'paste-chapter-select')" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Chapter</label>
+              <select id="paste-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Note Title</label>
+            <input type="text" id="paste-note-title" class="form-control" placeholder="e.g. Divisibility Rules & Remainder Theorems" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes Content (Paste your study text, definitions, formulas, or short notes)</label>
+            <textarea id="paste-note-content" class="form-control" style="min-height: 220px;" placeholder="Paste text here..." required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-note-paste')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Note</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Note Upload Modal -->
+  <div class="modal-backdrop" id="modal-note-upload">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">Upload Notes Document</div>
+        <button class="modal-close" onclick="closeModal('modal-note-upload')">×</button>
+      </div>
+      <form id="form-note-upload" onsubmit="handleNoteUploadSubmit(event)">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Subject</label>
+              <select id="upload-subject-select" class="form-control" onchange="populateChapterSelect('upload-subject-select', 'upload-chapter-select')" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Chapter</label>
+              <select id="upload-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Document Title</label>
+            <input type="text" id="upload-note-title" class="form-control" placeholder="e.g. Mensuration 2D & 3D Formulas PDF" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Select Document (.pdf, .txt, .md)</label>
+            <input type="file" id="upload-file-input" class="form-control" accept=".pdf,.txt,.md" required>
+            <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Text will be extracted automatically for your review.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-note-upload')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Upload & Process</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Note View & Edit Modal -->
+  <div class="modal-backdrop" id="modal-note-view">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title" id="note-view-title">Note Details</div>
+        <button class="modal-close" onclick="closeModal('modal-note-view')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="note-view-id">
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;" id="note-view-meta"></div>
+        <div class="form-group">
+          <label class="form-label">Edit Title</label>
+          <input type="text" id="note-view-input-title" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Extracted Content (You can edit to correct any extraction errors)</label>
+          <textarea id="note-view-extracted-content" class="form-control" style="min-height: 240px;"></textarea>
+        </div>
+        <div id="note-view-extraction-info" style="font-size: 11px; color: var(--text-faint); font-family: var(--font-mono);"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-note-view')">Close</button>
+        <button type="button" class="btn btn-primary" onclick="saveNoteEdits()">Save Corrections</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flashcard Importer & Q&A Studio Modal -->
+  <div class="modal-backdrop" id="modal-flashcard-importer">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title">Paste & Import Flashcards (Q&A)</div>
+        <button class="modal-close" onclick="closeModal('modal-flashcard-importer')">×</button>
+      </div>
+      <form id="form-flashcard-importer" onsubmit="handleFlashcardImportSubmit(event)">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Subject</label>
+              <select id="import-card-subject-select" class="form-control" onchange="populateChapterSelect('import-card-subject-select', 'import-card-chapter-select')" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Chapter</label>
+              <select id="import-card-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <label class="form-label" style="margin-bottom: 0;">Paste Questions & Answers</label>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="loadFlashcardDemoFormat()">
+              Load Demo Format
+            </button>
+          </div>
+          
+          <div class="form-group">
+            <textarea id="import-card-raw-text" class="form-control" style="min-height: 250px; font-family: var(--font-mono); font-size: 13px;" placeholder="Q: Question text&#10;A: Answer text&#10;&#10;Q: Another question&#10;A: Another answer" required></textarea>
+            <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">
+              Format: Start questions with <code>Q:</code> and answers with <code>A:</code>. Separate cards with a blank line or <code>---</code>.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-flashcard-importer')">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="previewPastedFlashcards()">Preview Cards</button>
+          <button type="submit" class="btn btn-primary">Import & Save Flashcards</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Practice Question (MCQ) Importer Modal -->
+  <div class="modal-backdrop" id="modal-question-importer">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title">Paste & Import Practice Questions (MCQs)</div>
+        <button class="modal-close" onclick="closeModal('modal-question-importer')">×</button>
+      </div>
+      <form id="form-question-importer" onsubmit="handleQuestionImportSubmit(event)">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Subject</label>
+              <select id="import-q-subject-select" class="form-control" onchange="populateChapterSelect('import-q-subject-select', 'import-q-chapter-select')" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Chapter</label>
+              <select id="import-q-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <label class="form-label" style="margin-bottom: 0;">Paste Multiple Choice Questions</label>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="loadPracticeQuestionDemoFormat()">
+              Load Demo Format
+            </button>
+          </div>
+
+          <div class="form-group">
+            <textarea id="import-q-raw-text" class="form-control" style="min-height: 250px; font-family: var(--font-mono); font-size: 13px;" placeholder="Q: Question text&#10;A) Option 1&#10;B) Option 2&#10;C) Option 3&#10;D) Option 4&#10;Correct: A&#10;Explanation: Why A is correct" required></textarea>
+            <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">
+              Format: <code>Q: ...</code>, options <code>A) ... B) ... C) ... D) ...</code>, <code>Correct: [A/B/C/D]</code>, and optional <code>Explanation: ...</code>. Separate questions with <code>---</code>.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-question-importer')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Import & Save Practice Questions</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Interactive Active Recall Flashcard Revision Modal (SM-2) -->
+  <div class="modal-backdrop" id="modal-flashcard-study">
+    <div class="modal-dialog" style="max-width: 680px;">
+      <div class="modal-header">
+        <div class="modal-title">Active Recall Revision (SM-2)</div>
+        <button class="modal-close" onclick="closeFlashcardStudyModal()">×</button>
+      </div>
+      <div class="modal-body" id="study-session-body">
+        <div class="flashcard-session-container">
+          <div class="flashcard-meta-bar">
+            <span id="study-card-counter">Card 1 of 10</span>
+            <span id="study-card-chapter">Chapter</span>
+          </div>
+
+          <div class="flashcard-display-card">
+            <div class="flashcard-type-tag" id="study-card-type">CONCEPT</div>
+            <div class="flashcard-question-text" id="study-question-text">Question goes here?</div>
+            
+            <div class="flashcard-answer-box" id="study-answer-box" style="display: none;">
+              <div class="flashcard-answer-text" id="study-answer-text">Answer text</div>
+              <div class="flashcard-source-ref" id="study-source-ref">Source Reference</div>
+            </div>
+          </div>
+
+          <!-- Controls: Step 1 = Reveal, Step 2 = SM-2 Rating -->
+          <div id="study-reveal-control">
+            <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="revealFlashcardAnswer()">
+              Reveal Answer (Spacebar)
+            </button>
+          </div>
+
+          <div id="study-rating-controls" style="display: none;">
+            <div style="font-size: 12px; text-align: center; color: var(--text-muted); margin-bottom: 8px;">
+              Rate your active recall difficulty:
+            </div>
+            <div class="rating-bar">
+              <button class="btn-rating again" onclick="submitCardRating(1)">
+                <span class="rating-name" style="color: var(--status-danger);">Again (1)</span>
+                <span class="rating-sub">Failed recall</span>
+              </button>
+              <button class="btn-rating hard" onclick="submitCardRating(2)">
+                <span class="rating-name" style="color: var(--status-warning);">Hard (2)</span>
+                <span class="rating-sub">Recalled with effort</span>
+              </button>
+              <button class="btn-rating good" onclick="submitCardRating(3)">
+                <span class="rating-name" style="color: var(--accent-primary-text);">Good (3)</span>
+                <span class="rating-sub">Correct recall</span>
+              </button>
+              <button class="btn-rating easy" onclick="submitCardRating(4)">
+                <span class="rating-name" style="color: var(--status-success);">Easy (4)</span>
+                <span class="rating-sub">Instant recall</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="study-summary-view" style="display: none; text-align: center; padding: 20px 0;">
+            <div style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">Session Completed</div>
+            <p style="color: var(--text-muted); margin-bottom: 20px;" id="study-summary-msg">All scheduled cards reviewed.</p>
+            <div class="metrics-grid" style="margin-bottom: 20px;">
+              <div class="metric-card">
+                <div class="metric-label">Reviewed</div>
+                <div class="metric-val" id="summary-reviewed-count">0</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Correct Recall</div>
+                <div class="metric-val" style="color: var(--status-success);" id="summary-correct-count">0</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Lapses (Again)</div>
+                <div class="metric-val" style="color: var(--status-danger);" id="summary-lapse-count">0</div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="closeFlashcardStudyModal()">Done</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Configuration Modal -->
+  <div class="modal-backdrop" id="modal-test-config">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">Configure Practice Test</div>
+        <button class="modal-close" onclick="closeModal('modal-test-config')">×</button>
+      </div>
+      <form id="form-test-config" onsubmit="handleStartTest(event)">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Subject</label>
+              <select id="test-subject-select" class="form-control" onchange="populateChapterSelect('test-subject-select', 'test-chapter-select')" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Chapter</label>
+              <select id="test-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Number of Questions</label>
+              <select id="test-question-count" class="form-control">
+                <option value="5">5 Questions</option>
+                <option value="10">10 Questions</option>
+                <option value="15">15 Questions</option>
+                <option value="25">25 Questions (SSC Sectional)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Difficulty</label>
+              <select id="test-difficulty" class="form-control">
+                <option value="Easy">Easy (Fundamental)</option>
+                <option value="Medium" selected>Medium (Standard CHSL)</option>
+                <option value="Hard">Hard (Tier 2 Level)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Test Mode</label>
+            <select id="test-mode" class="form-control">
+              <option value="exam">Examination Mode (Timed, answers revealed after submit)</option>
+              <option value="practice">Practice Mode</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+              <input type="checkbox" id="test-include-mistakes" checked>
+              Prioritize questions previously missed in Mistake Notebook
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-test-config')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Generate & Begin Test</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Fullscreen Exam Simulator Modal -->
+  <div class="modal-backdrop" id="modal-exam-simulator" style="background: var(--bg-page);">
+    <div class="modal-dialog" style="max-width: 1200px; height: 95vh; border: none; box-shadow: none;">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="exam-sim-title">SSC CHSL Practice Examination</div>
+          <div style="font-size: 11px; color: var(--text-muted);" id="exam-sim-sub">Sectional Test</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div class="exam-timer" id="exam-timer-display">00:00</div>
+          <button class="btn btn-danger btn-sm" onclick="confirmSubmitTest()">Submit Test</button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding: 20px 0;">
+        <div class="exam-layout">
+          <!-- Main Question Panel -->
+          <div class="exam-main-panel">
+            <div class="exam-meta-bar">
+              <span id="exam-current-q-index">Question 1 of 10</span>
+              <span class="badge badge-gray" id="exam-q-topic">Topic</span>
+            </div>
+
+            <div class="exam-question-text" id="exam-q-text">Loading question text...</div>
+            <div class="exam-options-list" id="exam-options-container">
+              <!-- Options List -->
+            </div>
+
+            <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 16px;">
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="prevExamQuestion()">Previous</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleMarkForReview()" id="btn-mark-review">Mark for Review</button>
+                <button class="btn btn-secondary btn-sm" onclick="clearSelectedOption()">Clear Selection</button>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="nextExamQuestion()">Save & Next</button>
+            </div>
+          </div>
+
+          <!-- Question Palette Panel -->
+          <div class="exam-palette-panel">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Question Palette</div>
+            <div style="font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;">
+              <div><span class="badge badge-green" style="width: 14px; height: 14px; display:inline-block; vertical-align:middle;"></span> Answered</div>
+              <div><span class="badge badge-amber" style="width: 14px; height: 14px; display:inline-block; vertical-align:middle;"></span> Marked for Review</div>
+              <div><span class="badge badge-gray" style="width: 14px; height: 14px; display:inline-block; vertical-align:middle;"></span> Not Attempted</div>
+            </div>
+            <div class="palette-grid" id="exam-palette-grid">
+              <!-- 1, 2, 3... buttons -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Results & Diagnostics Modal -->
+  <div class="modal-backdrop" id="modal-test-results">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title">Examination Scorecard & Detailed Solutions</div>
+        <button class="modal-close" onclick="closeModal('modal-test-results')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="metrics-grid" style="margin-bottom: 20px;">
+          <div class="metric-card">
+            <div class="metric-label">Total Score</div>
+            <div class="metric-val" id="res-score-val">0</div>
+            <div class="metric-sub" id="res-max-score-sub">Max: 0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Accuracy</div>
+            <div class="metric-val" id="res-accuracy-val">0%</div>
+            <div class="metric-sub" id="res-time-sub">Time: 0s</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Correct Answers</div>
+            <div class="metric-val" style="color: var(--status-success);" id="res-correct-val">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Incorrect Answers</div>
+            <div class="metric-val" style="color: var(--status-danger);" id="res-incorrect-val">0</div>
+            <div class="metric-sub">Added to Mistake Notebook</div>
+          </div>
+        </div>
+
+        <div style="font-weight: 600; font-size: 14px; margin-bottom: 12px;">Question Analysis & Explanations</div>
+        <div id="test-breakdown-list" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Solutions -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeModal('modal-test-results')">Close Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake Reflection Modal -->
+  <div class="modal-backdrop" id="modal-mistake-edit">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">Classify Error & Add Reflection</div>
+        <button class="modal-close" onclick="closeModal('modal-mistake-edit')">×</button>
+      </div>
+      <form id="form-mistake-edit" onsubmit="handleMistakeEditSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="mistake-edit-id">
+          <div class="form-group">
+            <label class="form-label">Error Classification</label>
+            <select id="mistake-edit-type" class="form-control" required>
+              <option value="Memory Failure">Memory Failure (Forgot rule/formula)</option>
+              <option value="Conceptual Misunderstanding">Conceptual Misunderstanding (Flawed fundamental premise)</option>
+              <option value="Calculation Error">Calculation Error (Rough work / arithmetic lapse)</option>
+              <option value="Careless Mistake">Careless Mistake (Misread question / options)</option>
+              <option value="Unclassified">Unclassified</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Why did you make this mistake? (Personal reflection & corrective rule)</label>
+            <textarea id="mistake-edit-reflection" class="form-control" placeholder="Write exact reason and how to prevent it next time..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="mistake-edit-status" class="form-control">
+              <option value="unresolved">Unresolved (Needs revision)</option>
+              <option value="in_progress">In Progress</option>
+              <option value="mastered">Mastered (Eliminated error)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-mistake-edit')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Mistake</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- PYQ Modal -->
+  <div class="modal-backdrop" id="modal-pyq">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title">Add Authentic Previous Year Question (PYQ)</div>
+        <button class="modal-close" onclick="closeModal('modal-pyq')">×</button>
+      </div>
+      <form id="form-pyq" onsubmit="handlePYQSubmit(event)">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Subject</label>
+              <select id="pyq-subject-select" class="form-control" onchange="populateChapterSelect('pyq-subject-select', 'pyq-chapter-select')" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Chapter</label>
+              <select id="pyq-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Exam Tier</label>
+              <input type="text" id="pyq-exam" class="form-control" value="SSC CHSL Tier 1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Exam Year</label>
+              <input type="text" id="pyq-year" class="form-control" value="2023" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Question Text</label>
+            <textarea id="pyq-q-text" class="form-control" style="min-height: 80px;" required placeholder="Exact authentic question text"></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Option A</label>
+              <input type="text" id="pyq-opt-a" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Option B</label>
+              <input type="text" id="pyq-opt-b" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Option C</label>
+              <input type="text" id="pyq-opt-c" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Option D</label>
+              <input type="text" id="pyq-opt-d" class="form-control" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Correct Option</label>
+            <select id="pyq-correct-select" class="form-control" required>
+              <option value="A">Option A</option>
+              <option value="B">Option B</option>
+              <option value="C">Option C</option>
+              <option value="D">Option D</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Explanation & Solution</label>
+            <textarea id="pyq-explanation" class="form-control" style="min-height: 80px;" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-pyq')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Verified PYQ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Generic Confirmation Modal -->
+  <div class="modal-backdrop" id="modal-confirm">
+    <div class="modal-dialog" style="max-width: 400px;">
+      <div class="modal-header">
+        <div class="modal-title" id="confirm-modal-title">Confirm Action</div>
+        <button class="modal-close" onclick="closeModal('modal-confirm')">×</button>
+      </div>
+      <div class="modal-body" id="confirm-modal-msg">
+        Are you sure you want to proceed?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-confirm')">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-modal-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
