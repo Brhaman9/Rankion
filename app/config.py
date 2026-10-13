@@ -24,11 +24,6 @@ if env_path.exists():
     except Exception:
         pass
 
-# AI Configuration (OpenAI)
-DEFAULT_AI_MODE = "external_api"
-DEFAULT_AI_PROVIDER = "openai"
-DEFAULT_AI_MODEL = "gpt-4o-mini"
-DEFAULT_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # Ensure directories exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)

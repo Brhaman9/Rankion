@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rankion</title>
   <link rel="stylesheet" href="/static/css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/static/js/supabase-config.js"></script>
 </head>
 <body>
 
@@ -97,9 +99,13 @@
           </div>
         </div>
         <div class="topbar-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal()">+ Paste Note</button>
-          <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Paste Flashcards</button>
-          <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Paste Questions</button>
+          <button id="btn-supabase-status" class="btn btn-secondary btn-sm" onclick="openSupabaseConfigModal()" style="display: inline-flex; align-items: center; gap: 6px;" title="Supabase Database Settings">
+            <span id="sb-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
+            <span id="sb-status-text">Connect Supabase</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal()">+ Note</button>
+          <button class="btn btn-secondary btn-sm" onclick="openFlashcardAddModal()">+ Flashcard</button>
+          <button class="btn btn-secondary btn-sm" onclick="openQuestionAddModal()">+ Question</button>
           <button class="btn btn-primary btn-sm" onclick="startDailyRevisionSession()">Revise Due Cards</button>
         </div>
       </header>
@@ -271,9 +277,11 @@
                 <select id="notes-chapter-filter" class="form-control" style="width: 180px;" onchange="loadNotesList()">
                   <option value="">All Chapters</option>
                 </select>
-                <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal()">+ Paste Note</button>
-                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Paste Flashcards</button>
-                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Paste Questions</button>
+                <button class="btn btn-primary btn-sm" onclick="openNotePasteModal()">+ Add Note</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardAddModal()">+ Add Flashcard</button>
+                <button class="btn btn-secondary btn-sm" onclick="openQuestionAddModal()">+ Add Question</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Bulk Cards</button>
+                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Bulk MCQs</button>
                 <button class="btn btn-secondary btn-sm" onclick="openNoteUploadModal()">Upload File</button>
               </div>
             </div>
@@ -313,7 +321,8 @@
                 <select id="flashcard-chapter-filter" class="form-control" style="width: 200px;" onchange="loadFlashcardsList()">
                   <option value="">All Chapters</option>
                 </select>
-                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Paste Flashcards (Q&A)</button>
+                <button class="btn btn-primary btn-sm" onclick="openFlashcardAddModal()">+ Add Flashcard</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Bulk Paste (Q&A)</button>
                 <button class="btn btn-primary btn-sm" onclick="startDailyRevisionSession()">Revise Due Cards</button>
               </div>
             </div>
@@ -355,7 +364,8 @@
                 <select id="tests-chapter-filter" class="form-control" style="width: 200px;" onchange="loadPracticeQuestionsList()">
                   <option value="">All Chapters</option>
                 </select>
-                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Paste Questions (MCQs)</button>
+                <button class="btn btn-primary btn-sm" onclick="openQuestionAddModal()">+ Add Question</button>
+                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Bulk Paste (MCQs)</button>
                 <button class="btn btn-primary btn-sm" onclick="openTestConfigModal()">+ Start Practice Test</button>
               </div>
             </div>
@@ -595,6 +605,37 @@
              ================================================================== -->
         <section id="view-settings" class="app-view" style="display: none;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Supabase Cloud Database Configuration -->
+            <div class="card" style="grid-column: span 2; border-left: 4px solid var(--accent-primary);">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Supabase Cloud Database (PostgreSQL)</div>
+                  <div class="card-desc">Your data is hosted directly in the cloud on Supabase free tier. No local storage, no Render server needed.</div>
+                </div>
+                <div id="settings-sb-badge" class="badge badge-amber">Checking...</div>
+              </div>
+              <form id="settings-supabase-form" onsubmit="handleSaveSupabaseConfig(event)">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                  <div class="form-group">
+                    <label class="form-label">Supabase Project URL</label>
+                    <input type="url" id="setting-sb-url" class="form-control" placeholder="https://your-project.supabase.co" required>
+                    <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Found in Supabase Project Settings > API > Project URL</div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Supabase Anon Public API Key</label>
+                    <input type="text" id="setting-sb-key" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+                    <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Found in Supabase Project Settings > API > Project API Keys > anon (public)</div>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap;">
+                  <button type="submit" class="btn btn-primary">Save & Connect Supabase</button>
+                  <button type="button" class="btn btn-secondary" onclick="testSupabaseConnection()">Test Connection</button>
+                  <button type="button" class="btn btn-secondary" onclick="openSupabaseSchemaModal()">View SQL Schema Migration</button>
+                  <span id="setting-sb-status-msg" style="font-size: 13px;"></span>
+                </div>
+              </form>
+            </div>
+
             <!-- Revision & Study Preferences -->
             <div class="card">
               <div class="card-header">
@@ -1058,7 +1099,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-test-config')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Generate & Begin Test</button>
+          <button type="submit" class="btn btn-primary">Start Practice Test</button>
         </div>
       </form>
     </div>
@@ -1290,7 +1331,206 @@
     </div>
   </div>
 
-  <!-- Toast Notification Container -->
+
+  <!-- ========================================================================
+       NEW MODALS: SINGLE FLASHCARD, SINGLE QUESTION, SUPABASE CONFIG & SCHEMA
+       ======================================================================== -->
+
+  <!-- Add Single Flashcard Modal -->
+  <div class="modal-backdrop" id="modal-flashcard-add">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-flashcard-add-title">Add Flashcard</div>
+        <button class="modal-close" onclick="closeModal('modal-flashcard-add')">&times;</button>
+      </div>
+      <form id="form-flashcard-add" onsubmit="handleFlashcardAddSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="card-add-id">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Subject</label>
+              <select id="card-add-subject-select" class="form-control" onchange="populateChapterSelect('card-add-subject-select', 'card-add-chapter-select')" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Chapter</label>
+              <select id="card-add-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Card Type</label>
+            <select id="card-add-type" class="form-control">
+              <option value="concept">Concept</option>
+              <option value="definition">Definition</option>
+              <option value="formula">Formula</option>
+              <option value="fact">Fact Recall</option>
+              <option value="rule_exception">Rule & Exception</option>
+              <option value="comparison">Comparison / Distinction</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Question (Front)</label>
+            <textarea id="card-add-question" class="form-control" style="min-height: 90px;" placeholder="Enter question or prompt..." required></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Answer (Back)</label>
+            <textarea id="card-add-answer" class="form-control" style="min-height: 100px;" placeholder="Enter answer or explanation..." required></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Source / Reference (Optional)</label>
+            <input type="text" id="card-add-source" class="form-control" placeholder="e.g. Chapter 4, Notes p. 12">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-flashcard-add')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-flashcard-add-submit">Save Flashcard</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Single Practice Question (MCQ) Modal -->
+  <div class="modal-backdrop" id="modal-question-add">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-question-add-title">Add Practice Question (MCQ)</div>
+        <button class="modal-close" onclick="closeModal('modal-question-add')">&times;</button>
+      </div>
+      <form id="form-question-add" onsubmit="handleQuestionAddSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="q-add-id">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Subject</label>
+              <select id="q-add-subject-select" class="form-control" onchange="populateChapterSelect('q-add-subject-select', 'q-add-chapter-select')" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Chapter</label>
+              <select id="q-add-chapter-select" class="form-control" required></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Question Text</label>
+            <textarea id="q-add-text" class="form-control" style="min-height: 80px;" placeholder="Enter question text..." required></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Option A</label>
+              <input type="text" id="q-add-opt-a" class="form-control" placeholder="Option A text" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Option B</label>
+              <input type="text" id="q-add-opt-b" class="form-control" placeholder="Option B text" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Option C</label>
+              <input type="text" id="q-add-opt-c" class="form-control" placeholder="Option C text" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Option D</label>
+              <input type="text" id="q-add-opt-d" class="form-control" placeholder="Option D text" required>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Correct Option</label>
+              <select id="q-add-correct" class="form-control" required>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Difficulty</label>
+              <select id="q-add-difficulty" class="form-control">
+                <option value="Easy">Easy</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Explanation / Solution Reasoning</label>
+            <textarea id="q-add-explanation" class="form-control" style="min-height: 70px;" placeholder="Detailed explanation..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Topic / Reference (Optional)</label>
+            <input type="text" id="q-add-topic" class="form-control" placeholder="e.g. Percentage, Profit & Loss">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-question-add')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-question-add-submit">Save Question</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Supabase Database Config Modal -->
+  <div class="modal-backdrop" id="modal-supabase-config">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">Connect Supabase Cloud Database</div>
+        <button class="modal-close" onclick="closeModal('modal-supabase-config')">&times;</button>
+      </div>
+      <form id="form-supabase-config" onsubmit="handleSaveSupabaseConfig(event)">
+        <div class="modal-body">
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
+            Rankion stores all your flashcards, questions, notes, and progress in your free Supabase PostgreSQL cloud database.
+          </div>
+          <div class="form-group">
+            <label class="form-label">Supabase Project URL</label>
+            <input type="url" id="sb-input-url" class="form-control" placeholder="https://your-project.supabase.co" required>
+            <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">
+              Supabase Dashboard &gt; Project Settings &gt; API &gt; Project URL
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Supabase Anon Public API Key</label>
+            <input type="text" id="sb-input-key" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+            <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">
+              Supabase Dashboard &gt; Project Settings &gt; API &gt; Project API Keys &gt; anon (public)
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openSupabaseSchemaModal()">
+              View SQL Schema Migration Script
+            </button>
+          </div>
+          <div id="sb-test-status" style="margin-top: 12px; font-size: 12px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-supabase-config')">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="testSupabaseConnection()">Test Connection</button>
+          <button type="submit" class="btn btn-primary">Save &amp; Connect</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Supabase SQL Schema Migration Viewer Modal -->
+  <div class="modal-backdrop" id="modal-supabase-schema">
+    <div class="modal-dialog lg">
+      <div class="modal-header">
+        <div class="modal-title">Supabase SQL Schema Script</div>
+        <button class="modal-close" onclick="closeModal('modal-supabase-schema')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+          Copy this SQL script, open your Supabase project dashboard, navigate to <strong>SQL Editor</strong>, paste this script, and click <strong>Run</strong>.
+        </div>
+        <div class="form-group">
+          <textarea id="supabase-schema-text" class="form-control" style="min-height: 280px; font-family: var(--font-mono); font-size: 11px; white-space: pre;" readonly></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-supabase-schema')">Close</button>
+        <button type="button" class="btn btn-primary" onclick="copySupabaseSchema()">Copy SQL Script to Clipboard</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- Toast Notification Container -->
   <div id="toast-container"></div>
 
   <!-- Scripts -->

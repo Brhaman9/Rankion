@@ -17,11 +17,11 @@ def run_e2e_verification():
     res = client.post("/api/auth/unlock", json={"passcode": "2486"})
     assert res.status_code == 200, f"Expected 200, got {res.status_code}"
     token = res.json()["token"]
-    print(f"PASS: Correct passcode 2486 unlocked! Token: {token[:10]}...")
-
-    print("\n=== STEP 2: CREATE USER SUBJECT ===")
+    import time
+    unique_sub_name = f"Quantitative Aptitude {int(time.time())}"
+    print(f"\n=== STEP 2: CREATE USER SUBJECT ({unique_sub_name}) ===")
     res = client.post("/api/subjects", json={
-        "name": "Quantitative Aptitude",
+        "name": unique_sub_name,
         "description": "SSC CHSL Tier 1 & 2 Core Arithmetic & Advanced Maths"
     })
     assert res.status_code == 200, f"Failed subject creation: {res.text}"
@@ -60,21 +60,23 @@ Euler's Totient Function: Used for finding remainder of a^(phi(n)) divided by n 
     note_id = note["id"]
     print(f"PASS: Added Note '{note['title']}' (ID: {note_id}) with status '{note['extraction_status']}'")
 
-    print("\n=== STEP 5: AI FLASHCARD GENERATION (Using Configured OpenAI/Built-in Engine) ===")
-    res = client.post(f"/api/flashcards/generate?note_id={note_id}")
-    assert res.status_code == 200, f"Flashcard generation failed: {res.text}"
-    gen_data = res.json()
-    cards = gen_data["cards"]
-    print(f"PASS: Generated {len(cards)} flashcards via engine '{gen_data['source']}'")
-    for i, c in enumerate(cards[:3]):
-        print(f"   Card {i+1} [{c['card_type']}]: {c['question'][:65]}... -> {c['answer'][:50]}...")
+    print("\n=== STEP 5: DIRECT FLASHCARD IMPORT (Q&A) ===")
+    fc_text = """Q: When is a number divisible by 3?
+A: If the sum of all its digits is divisible by 3.
+Type: Concept
 
-    print("\n=== STEP 6: APPROVE & SAVE FLASHCARDS ===")
-    res = client.post("/api/flashcards/batch-approve", json={"cards": cards})
-    assert res.status_code == 200, f"Batch approve failed: {res.text}"
+Q: What is the formula for Dividend?
+A: Dividend = (Divisor * Quotient) + Remainder.
+Type: Formula"""
+    res = client.post("/api/flashcards/import-text", json={
+        "subject_id": subject_id,
+        "chapter_id": chapter_id,
+        "raw_text": fc_text
+    })
+    assert res.status_code == 200, f"Import failed: {res.text}"
     saved_count = res.json()["count"]
     first_card_id = res.json()["inserted_ids"][0]
-    print(f"PASS: Successfully approved and saved {saved_count} flashcards into SM-2 schedule.")
+    print(f"PASS: Successfully imported {saved_count} flashcards directly into SM-2 schedule.")
 
     print("\n=== STEP 7: INTERACTIVE ACTIVE RECALL REVIEW (SM-2) ===")
     # Submit rating 3 (Good)
@@ -87,11 +89,39 @@ Euler's Totient Function: Used for finding remainder of a^(phi(n)) divided by n 
     rev_data = res.json()
     print(f"PASS: SM-2 Review recorded! Next Interval: {rev_data['sm2']['interval_days']} day(s), New Due Date: {rev_data['sm2']['due_date']}, Ease Factor: {rev_data['sm2']['ease_factor']}")
 
+    print("\n=== STEP 7.5: IMPORT PRACTICE QUESTIONS (MCQS) ===")
+    mcq_text = """Q: If a number is divisible by both 3 and 4, it must be divisible by?
+A) 6
+B) 12
+C) 24
+D) 7
+Correct: B
+Explanation: LCM of 3 and 4 is 12.
+Difficulty: Easy
+
+---
+
+Q: What is the remainder when 17 is divided by 5?
+A) 1
+B) 2
+C) 3
+D) 4
+Correct: B
+Explanation: 17 = 5 * 3 + 2.
+Difficulty: Easy"""
+    res = client.post("/api/tests/import-text", json={
+        "subject_id": subject_id,
+        "chapter_id": chapter_id,
+        "raw_text": mcq_text
+    })
+    assert res.status_code == 200, f"MCQ Import failed: {res.text}"
+    print(f"PASS: Imported {res.json()['count']} MCQs for practice test.")
+
     print("\n=== STEP 8: GENERATE PRACTICE TEST & EXAM SIMULATOR ===")
     res = client.post("/api/tests/generate-and-start", json={
         "subject_id": subject_id,
         "chapter_id": chapter_id,
-        "num_questions": 3,
+        "num_questions": 2,
         "difficulty": "Medium",
         "test_mode": "exam",
         "include_mistakes": False

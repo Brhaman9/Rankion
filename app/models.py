@@ -132,8 +132,3 @@ class SettingsUpdate(BaseModel):
     daily_new_cards: Optional[int] = None
     daily_target_minutes: Optional[int] = None
     theme: Optional[str] = None # 'light', 'dark'
-    ai_mode: Optional[str] = None # 'built_in', 'external_api'
-    ai_provider: Optional[str] = None
-    ai_api_key: Optional[str] = None
-    ai_endpoint: Optional[str] = None
-    ai_model: Optional[str] = None

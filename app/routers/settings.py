@@ -11,13 +11,6 @@ def get_settings():
     with db_session() as conn:
         rows = conn.execute("SELECT key, value FROM settings;").fetchall()
         settings = {r["key"]: r["value"] for r in rows}
-        # Hide raw API key prefix/suffix for security in response
-        if settings.get("ai_api_key"):
-            key = settings["ai_api_key"]
-            if len(key) > 8:
-                settings["ai_api_key_masked"] = key[:4] + "..." + key[-4:]
-            else:
-                settings["ai_api_key_masked"] = "********"
         return settings
 
 @router.put("")
@@ -40,21 +33,6 @@ def update_settings(req: SettingsUpdate):
 
         if req.theme is not None:
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?);", (req.theme,))
-
-        if req.ai_mode is not None:
-            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_mode', ?);", (req.ai_mode,))
-
-        if req.ai_provider is not None:
-            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_provider', ?);", (req.ai_provider,))
-
-        if req.ai_api_key is not None:
-            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_api_key', ?);", (req.ai_api_key.strip(),))
-
-        if req.ai_endpoint is not None:
-            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_endpoint', ?);", (req.ai_endpoint.strip(),))
-
-        if req.ai_model is not None:
-            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_model', ?);", (req.ai_model.strip(),))
 
     return {"success": True, "message": "Settings updated successfully."}
 

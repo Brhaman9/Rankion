@@ -2,11 +2,7 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://rankion.onrender.com/api/:path*"
-    },
-    {
-      "source": "/((?!api|static).*)",
+      "source": "/((?!static).*)",
       "destination": "/index.html"
     }
   ]

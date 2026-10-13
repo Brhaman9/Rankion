@@ -143,21 +143,7 @@ def generate_draft_flashcards(
                 "context_snippet": ""
             })
     else:
-        # Fallback to local rule extractor
-        from app.ai_generator import AIGenerator
-        local_cards = AIGenerator._generate_builtin_flashcards(content, title, subject_name, chapter_name)
-        for c in local_cards:
-            draft_cards.append({
-                "subject_id": subj_id,
-                "chapter_id": chap_id,
-                "topic_id": top_id,
-                "note_id": note_id,
-                "card_type": c.get("card_type", "concept"),
-                "question": c.get("question", ""),
-                "answer": c.get("answer", ""),
-                "source_reference": c.get("source_reference", f"{title} | {chapter_name}"),
-                "context_snippet": c.get("context_snippet", "")
-            })
+        draft_cards = []
 
     if not draft_cards:
         raise HTTPException(

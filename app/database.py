@@ -2,10 +2,7 @@ import sqlite3
 import json
 from datetime import datetime
 from contextlib import contextmanager
-from app.config import (
-    DB_PATH, DEFAULT_PASSCODE, DEFAULT_AI_MODE,
-    DEFAULT_AI_PROVIDER, DEFAULT_AI_MODEL, DEFAULT_OPENAI_API_KEY
-)
+from app.config import DB_PATH, DEFAULT_PASSCODE
 
 def get_db():
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
@@ -282,14 +279,9 @@ def init_db():
             "daily_new_cards": "20",
             "daily_target_minutes": "180",
             "theme": "light",
-            "ai_mode": DEFAULT_AI_MODE,
-            "ai_api_key": DEFAULT_OPENAI_API_KEY,
-            "ai_provider": DEFAULT_AI_PROVIDER,
-            "ai_endpoint": "",
-            "ai_model": DEFAULT_AI_MODEL,
             "exam_target": "SSC CHSL 2027"
         }
 
         for k, v in default_settings.items():
-            cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE key LIKE 'ai_%';", (k, v))
+            cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING;", (k, v))
 
