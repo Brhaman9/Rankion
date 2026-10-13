@@ -418,6 +418,196 @@ function copySupabaseSchema() {
   }
 }
 
+
+// ==========================================================================
+// BULK UPLOAD SYSTEM: FILE HANDLING, PREVIEWS & TEMPLATES
+// ==========================================================================
+
+function openBulkChooserModal() {
+  openModal('modal-bulk-chooser');
+}
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function handleBulkCardFileSelect(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const content = e.target.result;
+    const txtArea = document.getElementById('import-card-raw-text');
+    if (txtArea) {
+      txtArea.value = content;
+      updateCardImportBadge();
+    }
+    const hint = document.getElementById('import-card-file-name-hint');
+    if (hint) {
+      hint.textContent = `Loaded file: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      hint.style.color = 'var(--accent-primary)';
+      hint.style.fontWeight = '600';
+    }
+    showToast(`Loaded "${file.name}"`, 'success');
+  };
+  reader.onerror = function() {
+    showToast('Failed to read file. Please ensure it is a valid text file.', 'danger');
+  };
+  reader.readAsText(file);
+}
+
+function updateCardImportBadge() {
+  const txt = document.getElementById('import-card-raw-text')?.value || '';
+  const parsed = parseFlashcardsText(txt);
+  const badge = document.getElementById('import-card-badge');
+  if (badge) {
+    badge.textContent = `${parsed.length} Card${parsed.length === 1 ? '' : 's'} Detected`;
+    badge.className = parsed.length > 0 ? 'badge badge-green' : 'badge badge-gray';
+  }
+}
+
+function clearCardImportText() {
+  const txtArea = document.getElementById('import-card-raw-text');
+  if (txtArea) txtArea.value = '';
+  const fileInput = document.getElementById('import-card-file-input');
+  if (fileInput) fileInput.value = '';
+  const hint = document.getElementById('import-card-file-name-hint');
+  if (hint) {
+    hint.textContent = 'Supports .txt, .tsv, .csv files, or paste raw text below';
+    hint.style.color = 'var(--text-muted)';
+    hint.style.fontWeight = 'normal';
+  }
+  updateCardImportBadge();
+}
+
+function downloadCardTemplate() {
+  const template = `Q: What is the 73rd Constitutional Amendment Act (1992) related to?
+A: Panchayati Raj Institutions (added Part IX and 11th Schedule with 29 subjects).
+Type: Concept
+
+Q: State the formula for Compound Interest when compounded annually.
+A: Amount = P * (1 + R/100)^T, Compound Interest = Amount - Principal.
+Type: Formula
+
+Q: What is the difference between Speed and Velocity in Physics?
+A: Speed is a scalar quantity, while Velocity is a vector quantity with direction.
+Type: Comparison
+
+# Single-line delimiter formats are also supported:
+# Capital of France | Paris
+# Speed of light in vacuum | 3 x 10^8 m/s
+# Article 21 :: Right to Life and Personal Liberty
+`;
+  downloadTextFile('flashcards_template.txt', template);
+  showToast('Downloaded flashcards_template.txt', 'info');
+}
+
+function handleBulkQuestionFileSelect(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const content = e.target.result;
+    const txtArea = document.getElementById('import-q-raw-text');
+    if (txtArea) {
+      txtArea.value = content;
+      updateQuestionImportBadge();
+    }
+    const hint = document.getElementById('import-q-file-name-hint');
+    if (hint) {
+      hint.textContent = `Loaded file: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      hint.style.color = 'var(--accent-primary)';
+      hint.style.fontWeight = '600';
+    }
+    showToast(`Loaded "${file.name}"`, 'success');
+  };
+  reader.onerror = function() {
+    showToast('Failed to read file. Please ensure it is a valid text file.', 'danger');
+  };
+  reader.readAsText(file);
+}
+
+function updateQuestionImportBadge() {
+  const txt = document.getElementById('import-q-raw-text')?.value || '';
+  const parsed = parsePracticeQuestionsText(txt);
+  const badge = document.getElementById('import-q-badge');
+  if (badge) {
+    badge.textContent = `${parsed.length} Question${parsed.length === 1 ? '' : 's'} Detected`;
+    badge.className = parsed.length > 0 ? 'badge badge-green' : 'badge badge-gray';
+  }
+}
+
+function clearQuestionImportText() {
+  const txtArea = document.getElementById('import-q-raw-text');
+  if (txtArea) txtArea.value = '';
+  const fileInput = document.getElementById('import-q-file-input');
+  if (fileInput) fileInput.value = '';
+  const hint = document.getElementById('import-q-file-name-hint');
+  if (hint) {
+    hint.textContent = 'Supports .txt files formatted with Q:, options A-D, and Ans:';
+    hint.style.color = 'var(--text-muted)';
+    hint.style.fontWeight = 'normal';
+  }
+  updateQuestionImportBadge();
+}
+
+function downloadQuestionTemplate() {
+  const template = `Q1. If a 9-digit number 785x3678y is divisible by 72, then what is the value of (x - y)?
+A) 2
+B) -1
+C) 0
+D) 1
+Ans: A
+Explanation: Divisibility by 8 and 9 gives y = 4, x = 6. Hence (x - y) = 6 - 4 = 2.
+Difficulty: Medium
+
+---
+
+Q2. Which Article of the Constitution of India guarantees Equality before Law?
+(A) Article 14
+(B) Article 19
+(C) Article 21
+(D) Article 32
+Ans: A
+Explanation: Article 14 guarantees equality before the law and equal protection of the laws.
+Difficulty: Easy
+
+---
+
+Q3. What is the unit of Electric Current in SI units?
+A. Volt
+B. Ampere
+C. Ohm
+D. Watt
+Correct Option: B
+Explanation: The SI unit of electric current is Ampere (A).
+Difficulty: Easy
+`;
+  downloadTextFile('questions_template.txt', template);
+  showToast('Downloaded questions_template.txt', 'info');
+}
+
+function previewPastedQuestions() {
+  const text = document.getElementById('import-q-raw-text')?.value.trim() || '';
+  const parsed = parsePracticeQuestionsText(text);
+  if (parsed.length === 0) {
+    showToast('No MCQs detected. Ensure questions have Q:, options A-D, and Ans:', 'warning');
+  } else {
+    showToast(`Detected ${parsed.length} MCQ(s)! First: "${parsed[0].question_text.slice(0, 50)}..."`, 'info');
+  }
+}
+
+
 // ==========================================================================
 // Initialization & Authentication (Passcode: 2486)
 // ==========================================================================
@@ -1294,6 +1484,13 @@ function openFlashcardImporterModal(preSubId = null, preChapId = null, preText =
   populateSubjectSelect('import-card-subject-select', preSubId);
   populateChapterSelect('import-card-subject-select', 'import-card-chapter-select', preChapId);
   if (preText) document.getElementById('import-card-raw-text').value = preText;
+  const hint = document.getElementById('import-card-file-name-hint');
+  if (hint) {
+    hint.textContent = 'Supports .txt, .tsv, .csv files, or paste raw text below';
+    hint.style.color = 'var(--text-muted)';
+    hint.style.fontWeight = 'normal';
+  }
+  updateCardImportBadge();
   openModal('modal-flashcard-importer');
 }
 
@@ -1307,9 +1504,17 @@ A: Amount = P * (1 + R/100)^T, Compound Interest = Amount - Principal.
 Type: Formula
 
 Q: What is the difference between Speed and Velocity in Physics?
-A: Speed is a scalar quantity (magnitude only), while Velocity is a vector quantity (magnitude with direction).
-Type: Comparison`;
-  document.getElementById('import-card-raw-text').value = demo;
+A: Speed is a scalar quantity, while Velocity is a vector quantity with direction.
+Type: Comparison
+
+Photosynthesis | Process by which green plants make food
+Newton's First Law | Law of Inertia
+Article 21 :: Right to Life and Personal Liberty`;
+  const txtArea = document.getElementById('import-card-raw-text');
+  if (txtArea) {
+    txtArea.value = demo;
+    updateCardImportBadge();
+  }
 }
 
 function previewPastedFlashcards() {
@@ -1663,30 +1868,52 @@ function openQuestionImporterModal(preSubId = null, preChapId = null, preText = 
   populateSubjectSelect('import-q-subject-select', preSubId);
   populateChapterSelect('import-q-subject-select', 'import-q-chapter-select', preChapId);
   if (preText) document.getElementById('import-q-raw-text').value = preText;
+  const hint = document.getElementById('import-q-file-name-hint');
+  if (hint) {
+    hint.textContent = 'Supports .txt files formatted with Q:, options A-D, and Ans:';
+    hint.style.color = 'var(--text-muted)';
+    hint.style.fontWeight = 'normal';
+  }
+  updateQuestionImportBadge();
   openModal('modal-question-importer');
 }
 
 function loadPracticeQuestionDemoFormat() {
-  const demo = `Q: If a 9-digit number 785x3678y is divisible by 72, then what is the value of (x - y)?
+  const demo = `Q1. If a 9-digit number 785x3678y is divisible by 72, then what is the value of (x - y)?
 A) 2
 B) -1
 C) 0
 D) 1
-Correct: A
+Ans: A
 Explanation: For divisibility by 72, the number must be divisible by 8 and 9. Last 3 digits 78y divisible by 8 gives y = 4. Sum of digits = 48 + x, so x = 6. (x - y) = 6 - 4 = 2.
 Difficulty: Medium
 
 ---
 
-Q: Which Article of the Constitution of India guarantees Equality before Law?
-A) Article 14
-B) Article 19
-C) Article 21
-D) Article 32
+Q2. Which Article of the Constitution of India guarantees Equality before Law?
+(A) Article 14
+(B) Article 19
+(C) Article 21
+(D) Article 32
+Ans: A
+Explanation: Article 14 guarantees equality before the law and equal protection of the laws within India.
+Difficulty: Easy
+
+---
+
+Q3. What is the chemical symbol for Gold?
+A. Au
+B. Ag
+C. Fe
+D. Pb
 Correct: A
-Explanation: Article 14 guarantees equality before the law or equal protection of laws.
+Explanation: The symbol Au comes from the Latin word Aurum.
 Difficulty: Easy`;
-  document.getElementById('import-q-raw-text').value = demo;
+  const txtArea = document.getElementById('import-q-raw-text');
+  if (txtArea) {
+    txtArea.value = demo;
+    updateQuestionImportBadge();
+  }
 }
 
 async function handleQuestionImportSubmit(event) {
@@ -2597,14 +2824,14 @@ function parseFlashcardsText(rawText) {
   if (!rawText || !rawText.trim()) return cards;
 
   const text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  const blocks = text.split(/\n\s*---\s*\n|\n\s*===\s*\n/);
+  const blocks = text.split(/\n\s*[-=]{3,}\s*\n/);
 
   for (let block of blocks) {
     block = block.trim();
     if (!block) continue;
 
-    // Check multiple Q:
-    const qMatches = [...block.matchAll(/(?:^|\n)\s*(?:Q|Question|Q\.\d+|Card\s*\d+)\s*[:\.\-]\s*/gi)];
+    // Check multiple Q: or Question:
+    const qMatches = [...block.matchAll(/(?:^|\n)\s*(?:Q|Question|Q\.\d+|Card\s*\d+|\d+\.)\s*[:\.\-]\s*/gi)];
     if (qMatches.length > 1) {
       for (let i = 0; i < qMatches.length; i++) {
         const start = qMatches[i].index;
@@ -2615,7 +2842,59 @@ function parseFlashcardsText(rawText) {
       }
     } else {
       const c = extractSingleCard(block);
-      if (c) cards.push(c);
+      if (c) {
+        cards.push(c);
+      } else {
+        // Line-by-line delimited check (TSV, Pipe |, Double Colon ::)
+        const lines = block.split('\n');
+        for (const line of lines) {
+          const l = line.trim();
+          if (!l || l.startsWith('#') || l.startsWith('//')) continue;
+          let parts = null;
+          if (l.includes('\t')) parts = l.split('\t');
+          else if (l.includes(' | ')) parts = l.split(' | ');
+          else if (l.includes(' :: ')) parts = l.split(' :: ');
+
+          if (parts && parts.length >= 2) {
+            const q = parts[0].trim();
+            const a = parts.slice(1).join(' | ').trim();
+            if (q && a) {
+              cards.push({
+                question: q,
+                answer: a,
+                card_type: 'concept',
+                source_reference: 'Bulk Upload'
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: If no cards found via blocks, try line-by-line delimiter on the entire text
+  if (cards.length === 0) {
+    const lines = text.split('\n');
+    for (const line of lines) {
+      const l = line.trim();
+      if (!l || l.startsWith('#') || l.startsWith('//')) continue;
+      let parts = null;
+      if (l.includes('\t')) parts = l.split('\t');
+      else if (l.includes(' | ')) parts = l.split(' | ');
+      else if (l.includes(' :: ')) parts = l.split(' :: ');
+
+      if (parts && parts.length >= 2) {
+        const q = parts[0].trim();
+        const a = parts.slice(1).join(' | ').trim();
+        if (q && a) {
+          cards.push({
+            question: q,
+            answer: a,
+            card_type: 'concept',
+            source_reference: 'Bulk Upload'
+          });
+        }
+      }
     }
   }
 
@@ -2679,13 +2958,34 @@ function parsePracticeQuestionsText(rawText) {
   if (!rawText || !rawText.trim()) return questions;
 
   const text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  const blocks = text.split(/\n\s*---\s*\n|\n\s*===\s*\n/);
+
+  // Try splitting by explicit separator first (--- or ===)
+  let blocks = text.split(/\n\s*[-=]{3,}\s*\n/);
+
+  // If there's only 1 block, split by question header indicators or double newlines
+  if (blocks.length === 1) {
+    const qHeaderRegex = /(?:^|\n)\s*(?:Q|Question|Q\d+|Q\.\d+|\d+\.)\s*[:\.\-\)]\s*/gi;
+    const qMatches = [...text.matchAll(qHeaderRegex)];
+    if (qMatches.length > 1) {
+      blocks = [];
+      for (let i = 0; i < qMatches.length; i++) {
+        const start = qMatches[i].index;
+        const end = i + 1 < qMatches.length ? qMatches[i + 1].index : text.length;
+        blocks.push(text.slice(start, end).trim());
+      }
+    } else {
+      const doubleNewlineBlocks = text.split(/\n\s*\n\s*\n|\n\s*\n/);
+      if (doubleNewlineBlocks.length > 1) {
+        blocks = doubleNewlineBlocks;
+      }
+    }
+  }
 
   for (let block of blocks) {
     block = block.trim();
     if (!block) continue;
 
-    const qMatches = [...block.matchAll(/(?:^|\n)\s*(?:Q|Question|Q\.\d+|\d+\.)\s*[:\.\-]\s*/gi)];
+    const qMatches = [...block.matchAll(/(?:^|\n)\s*(?:Q|Question|Q\d+|Q\.\d+|\d+\.)\s*[:\.\-\)]\s*/gi)];
     if (qMatches.length > 1) {
       for (let i = 0; i < qMatches.length; i++) {
         const start = qMatches[i].index;
@@ -2716,20 +3016,34 @@ function extractSingleMCQ(block) {
 
   for (let line of lines) {
     const stripped = line.trim();
-    if (!stripped) continue;
+    if (!stripped || stripped.startsWith('#') || stripped.startsWith('//')) continue;
 
-    const mQ = stripped.match(/^(?:Q|Question|Q\d+|Q\.\d+|\d+)[:\.\-\)]\s*(.*)$/i);
-    const mOpt = stripped.match(/^[\(\[]?([A-Da-d1-4])[\)\]\.\:\-]\s*(.*)$/);
-    const mCorr = stripped.match(/^(?:Correct(?:\s*Answer|\s*Option)?|Answer|Ans)\s*[:\.\-]?\s*(.*)$/i);
-    const mExp = stripped.match(/^(?:Explanation|Solution|Sol)\s*[:\.\-]?\s*(.*)$/i);
-    const mTop = stripped.match(/^Topic\s*[:\.\-]\s*(.*)$/i);
-    const mDiff = stripped.match(/^Difficulty\s*[:\.\-]\s*(.*)$/i);
+    const mCorr = stripped.match(/^(?:Correct(?:\s*Answer|\s*Option)?|Answer|Ans|Key|Right)[\s\:\.\-]+(.*)$/i);
+    const mExp = stripped.match(/^(?:Explanation|Solution|Sol|Exp)[\s\:\.\-]+(.*)$/i);
+    const mTop = stripped.match(/^Topic[\s\:\.\-]+(.*)$/i);
+    const mDiff = stripped.match(/^Difficulty[\s\:\.\-]+(.*)$/i);
+
+    // Option pattern: (A), A), A., [A], (1), 1), 1.
+    const mOptLetter = stripped.match(/^[\(\[]?([A-Da-d])[\)\]\.\:\-]\s*(.*)$/);
+    const mOptNum = qLines.length > 0 ? stripped.match(/^[\(\[]?([1-4])[\)\]\.\:\-]\s*(.*)$/) : null;
+    const mOpt = mOptLetter || mOptNum;
+
+    // Question prefix: Q:, Question 1:, Q1., 1., 1)
+    const mQ = stripped.match(/^(?:Q|Question|Q\d+|Q\.\d+|\d+)[\s\:\.\-\)]+(.*)$/i);
 
     if (mCorr) {
       curMode = 'CORR';
       const c = mCorr[1].trim().toUpperCase();
       const mLetter = c.match(/[A-D]/);
-      if (mLetter) correctAnswer = mLetter[0];
+      if (mLetter) {
+        correctAnswer = mLetter[0];
+      } else {
+        const mNum = c.match(/[1-4]/);
+        if (mNum) {
+          const charMap = { '1': 'A', '2': 'B', '3': 'C', '4': 'D' };
+          correctAnswer = charMap[mNum[0]];
+        }
+      }
     } else if (mExp) {
       curMode = 'EXP';
       explanationLines.push(mExp[1].trim());
@@ -2739,28 +3053,23 @@ function extractSingleMCQ(block) {
       difficulty = mDiff[1].trim();
     } else if (mOpt) {
       curMode = 'OPT';
-      const letter = mOpt[1].toUpperCase();
-      const text = mOpt[2].trim();
-      optMap[letter] = text;
-    } else if (mQ && curMode === 'Q') {
-      qLines.push(mQ[1].trim());
-    } else {
-      if (curMode === 'Q') qLines.push(line);
-      else if (curMode === 'EXP') explanationLines.push(line);
+      const key = mOpt[1].toUpperCase();
+      const letter = {'1':'A', '2':'B', '3':'C', '4':'D'}[key] || key;
+      optMap[letter] = mOpt[2].trim();
+    } else if (curMode === 'Q') {
+      if (mQ && qLines.length === 0) {
+        qLines.push(mQ[1].trim());
+      } else {
+        qLines.push(stripped);
+      }
+    } else if (curMode === 'EXP') {
+      explanationLines.push(stripped);
     }
   }
 
-  // Construct options A, B, C, D
   ['A', 'B', 'C', 'D'].forEach(k => {
     if (optMap[k]) options.push(optMap[k]);
   });
-
-  // Fallback if numbers 1-4 used
-  if (options.length === 0) {
-    ['1', '2', '3', '4'].forEach(k => {
-      if (optMap[k]) options.push(optMap[k]);
-    });
-  }
 
   const questionText = qLines.join('\n').trim();
   const explanation = explanationLines.join('\n').trim();

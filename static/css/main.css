@@ -1210,3 +1210,38 @@ textarea.form-control {
     margin: 14px;
   }
 }
+
+
+/* Bulk Upload Dropzone & Toolbar Styles */
+.bulk-upload-dropzone {
+  border: 2px dashed var(--border);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 14px;
+}
+
+.bulk-upload-dropzone:hover,
+.bulk-upload-dropzone.drag-over {
+  border-color: var(--accent-primary);
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.bulk-upload-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.bulk-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}

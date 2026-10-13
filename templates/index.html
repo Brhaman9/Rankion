@@ -109,6 +109,7 @@
             <span id="sb-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
             <span id="sb-status-text">Connect Supabase</span>
           </button>
+          <button class="btn btn-secondary btn-sm" onclick="openBulkChooserModal()" title="Bulk Upload Questions or Flashcards">📁 Bulk Upload</button>
           <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal()">+ Note</button>
           <button class="btn btn-secondary btn-sm" onclick="openFlashcardAddModal()">+ Flashcard</button>
           <button class="btn btn-secondary btn-sm" onclick="openQuestionAddModal()">+ Question</button>
@@ -328,7 +329,7 @@
                   <option value="">All Chapters</option>
                 </select>
                 <button class="btn btn-primary btn-sm" onclick="openFlashcardAddModal()">+ Add Flashcard</button>
-                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">+ Bulk Paste (Q&A)</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">📁 Bulk Upload (Text / .txt)</button>
                 <button class="btn btn-primary btn-sm" onclick="startDailyRevisionSession()">Revise Due Cards</button>
               </div>
             </div>
@@ -371,7 +372,7 @@
                   <option value="">All Chapters</option>
                 </select>
                 <button class="btn btn-primary btn-sm" onclick="openQuestionAddModal()">+ Add Question</button>
-                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">+ Bulk Paste (MCQs)</button>
+                <button class="btn btn-secondary btn-sm" onclick="openQuestionImporterModal()">📁 Bulk Upload (Text / .txt)</button>
                 <button class="btn btn-primary btn-sm" onclick="openTestConfigModal()">+ Start Practice Test</button>
               </div>
             </div>
@@ -890,11 +891,50 @@
     </div>
   </div>
 
+    <!-- Bulk Upload Chooser Modal -->
+  <div class="modal-backdrop" id="modal-bulk-chooser">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Bulk Upload in Text Format</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Batch import from text files (.txt) or direct pasting</div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-bulk-chooser')">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; padding: 20px;">
+        <div class="card" style="padding: 16px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;" onclick="closeModal('modal-bulk-chooser'); openFlashcardImporterModal();">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <div style="font-weight: 700; font-size: 15px; color: var(--accent-primary);">⚡ Bulk Flashcards (Q&A / Text)</div>
+            <span class="badge badge-blue">Text / .txt</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted);">
+            Batch import active recall flashcards with questions, answers, formulas, or short notes. Supports Q&A blocks, tab-separated, and pipe-separated lines.
+          </div>
+        </div>
+        <div class="card" style="padding: 16px; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s;" onclick="closeModal('modal-bulk-chooser'); openQuestionImporterModal();">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <div style="font-weight: 700; font-size: 15px; color: var(--status-success);">📝 Bulk Practice Questions (MCQs)</div>
+            <span class="badge badge-green">Text / .txt</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted);">
+            Batch import multiple choice questions with options A-D, answer keys, and detailed step-by-step explanations.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-bulk-chooser')">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Flashcard Importer & Q&A Studio Modal -->
   <div class="modal-backdrop" id="modal-flashcard-importer">
     <div class="modal-dialog lg">
       <div class="modal-header">
-        <div class="modal-title">Paste & Import Flashcards (Q&A)</div>
+        <div>
+          <div class="modal-title">Bulk Upload Flashcards (Text / .txt)</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Batch import active recall flashcards from text or text files</div>
+        </div>
         <button class="modal-close" onclick="closeModal('modal-flashcard-importer')">&times;</button>
       </div>
       <form id="form-flashcard-importer" onsubmit="handleFlashcardImportSubmit(event)">
@@ -910,24 +950,46 @@
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-            <label class="form-label" style="margin-bottom: 0;">Paste Questions & Answers</label>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="loadFlashcardDemoFormat()">
-              Load Demo Format
-            </button>
+          <!-- Dropzone for .txt files -->
+          <div class="bulk-upload-dropzone" id="card-upload-dropzone" onclick="document.getElementById('import-card-file-input').click()">
+            <input type="file" id="import-card-file-input" accept=".txt,.text,.csv,.tsv" style="display:none;" onchange="handleBulkCardFileSelect(event)">
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-main); margin-bottom: 2px;">
+              📁 Choose .txt File or Drag & Drop Here
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);" id="import-card-file-name-hint">
+              Supports .txt, .tsv, .csv files, or paste raw text below
+            </div>
+          </div>
+
+          <div class="bulk-upload-toolbar">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label class="form-label" style="margin-bottom: 0;">Flashcard Text Content</label>
+              <span id="import-card-badge" class="badge badge-gray">0 Cards Detected</span>
+            </div>
+            <div class="bulk-upload-actions">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="downloadCardTemplate()">
+                ⬇ Download Sample .txt
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="loadFlashcardDemoFormat()">
+                Load Sample
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="clearCardImportText()">
+                Clear
+              </button>
+            </div>
           </div>
           
           <div class="form-group">
-            <textarea id="import-card-raw-text" class="form-control" style="min-height: 250px; font-family: var(--font-mono); font-size: 13px;" placeholder="Q: Question text&#10;A: Answer text&#10;&#10;Q: Another question&#10;A: Another answer" required></textarea>
+            <textarea id="import-card-raw-text" class="form-control" style="min-height: 240px; font-family: var(--font-mono); font-size: 13px;" placeholder="Q: Question text&#10;A: Answer text&#10;&#10;OR single-line: Question | Answer&#10;OR tab-separated: Question	Answer" oninput="updateCardImportBadge()" required></textarea>
             <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">
-              Format: Start questions with <code>Q:</code> and answers with <code>A:</code>. Separate cards with a blank line or <code>---</code>.
+              Supported formats: (1) <code>Q: ...</code> and <code>A: ...</code>, or (2) Single-line delimited: <code>Front | Back</code> or <code>Term &lt;TAB&gt; Definition</code>.
             </div>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-flashcard-importer')">Cancel</button>
           <button type="button" class="btn btn-secondary" onclick="previewPastedFlashcards()">Preview Cards</button>
-          <button type="submit" class="btn btn-primary">Import & Save Flashcards</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-card-import">Import & Save Flashcards</button>
         </div>
       </form>
     </div>
@@ -937,7 +999,10 @@
   <div class="modal-backdrop" id="modal-question-importer">
     <div class="modal-dialog lg">
       <div class="modal-header">
-        <div class="modal-title">Paste & Import Practice Questions (MCQs)</div>
+        <div>
+          <div class="modal-title">Bulk Upload Practice Questions (MCQs / .txt)</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Batch import multiple-choice questions from text or text files</div>
+        </div>
         <button class="modal-close" onclick="closeModal('modal-question-importer')">&times;</button>
       </div>
       <form id="form-question-importer" onsubmit="handleQuestionImportSubmit(event)">
@@ -953,23 +1018,46 @@
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-            <label class="form-label" style="margin-bottom: 0;">Paste Multiple Choice Questions</label>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="loadPracticeQuestionDemoFormat()">
-              Load Demo Format
-            </button>
+          <!-- Dropzone for .txt files -->
+          <div class="bulk-upload-dropzone" id="q-upload-dropzone" onclick="document.getElementById('import-q-file-input').click()">
+            <input type="file" id="import-q-file-input" accept=".txt,.text,.csv,.tsv" style="display:none;" onchange="handleBulkQuestionFileSelect(event)">
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-main); margin-bottom: 2px;">
+              📁 Choose .txt File or Drag & Drop Here
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);" id="import-q-file-name-hint">
+              Supports .txt files formatted with Q:, options A-D, and Ans:
+            </div>
+          </div>
+
+          <div class="bulk-upload-toolbar">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label class="form-label" style="margin-bottom: 0;">MCQ Text Content</label>
+              <span id="import-q-badge" class="badge badge-gray">0 Questions Detected</span>
+            </div>
+            <div class="bulk-upload-actions">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="downloadQuestionTemplate()">
+                ⬇ Download Sample .txt
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="loadPracticeQuestionDemoFormat()">
+                Load Sample
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="clearQuestionImportText()">
+                Clear
+              </button>
+            </div>
           </div>
 
           <div class="form-group">
-            <textarea id="import-q-raw-text" class="form-control" style="min-height: 250px; font-family: var(--font-mono); font-size: 13px;" placeholder="Q: Question text&#10;A) Option 1&#10;B) Option 2&#10;C) Option 3&#10;D) Option 4&#10;Correct: A&#10;Explanation: Why A is correct" required></textarea>
+            <textarea id="import-q-raw-text" class="form-control" style="min-height: 240px; font-family: var(--font-mono); font-size: 13px;" placeholder="Q: Question text&#10;A) Option 1&#10;B) Option 2&#10;C) Option 3&#10;D) Option 4&#10;Ans: A&#10;Explanation: Why A is correct&#10;&#10;---" oninput="updateQuestionImportBadge()" required></textarea>
             <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">
-              Format: <code>Q: ...</code>, options <code>A) ... B) ... C) ... D) ...</code>, <code>Correct: [A/B/C/D]</code>, and optional <code>Explanation: ...</code>. Separate questions with <code>---</code>.
+              Format: <code>Q: ...</code> or <code>1. ...</code>, options <code>A) ... B) ... C) ... D) ...</code>, <code>Ans: A</code> (or <code>Correct: A</code>), and optional <code>Explanation: ...</code>. Separate questions with <code>---</code> or blank lines.
             </div>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-question-importer')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Import & Save Practice Questions</button>
+          <button type="button" class="btn btn-secondary" onclick="previewPastedQuestions()">Preview MCQs</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-q-import">Import & Save Practice Questions</button>
         </div>
       </form>
     </div>
