@@ -59,7 +59,9 @@ app.include_router(settings_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
-    index_file = BASE_DIR / "templates" / "index.html"
+    index_file = BASE_DIR / "index.html"
+    if not index_file.exists():
+        index_file = BASE_DIR / "templates" / "index.html"
     return FileResponse(index_file)
 
 @app.get("/health")

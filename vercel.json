@@ -1,18 +1,13 @@
 {
   "version": 2,
-  "cleanUrls": true,
-  "routes": [
+  "rewrites": [
     {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
+      "source": "/api/:path*",
+      "destination": "https://rankion.onrender.com/api/:path*"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "https://rankion.onrender.com/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/templates/index.html"
+      "source": "/((?!api|static).*)",
+      "destination": "/index.html"
     }
   ]
 }
