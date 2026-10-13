@@ -899,31 +899,314 @@ textarea.form-control {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Responsive adjustments */
+
+/* ==========================================================================
+   Comprehensive Mobile & Phone Responsiveness (<768px & <480px)
+   ========================================================================== */
+
+/* Mobile Close Button inside Sidebar */
+.mobile-close-sidebar-btn {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dark Backdrop for Mobile Sidebar */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 1050;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
 @media (max-width: 900px) {
   .exam-layout {
     grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+  .exam-palette-panel {
+    order: 2;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .exam-main-panel {
+    order: 1;
+    min-height: auto;
   }
 }
 
 @media (max-width: 768px) {
+  /* 1. Mobile Sidebar Navigation */
   .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 1100;
     transform: translateX(-100%);
-    transition: transform 0.2s ease;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
   }
   .sidebar.mobile-open {
     transform: translateX(0);
   }
+  .mobile-close-sidebar-btn {
+    display: flex;
+  }
   .main-wrapper {
     margin-left: 0;
+    width: 100%;
+    min-width: 0;
   }
   .mobile-menu-btn {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-main);
+    cursor: pointer;
   }
+
+  /* 2. Topbar on Mobile */
+  .topbar {
+    height: auto;
+    min-height: 56px;
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 90;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .topbar-left > div {
+    min-width: 0;
+  }
+  .page-breadcrumb {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .page-title {
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .topbar-actions .btn {
+    font-size: 11px;
+    padding: 6px 10px;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  /* 3. Content Viewport & Padding */
+  .content-viewport {
+    padding: 12px 10px;
+  }
+
+  /* 4. Cards & Card Headers */
+  .card {
+    padding: 14px 12px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-md);
+  }
+  .card-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .card-header > div:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+  .card-header select.form-control {
+    width: 100% !important;
+  }
+  .card-header .btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  /* 5. Grids and Settings */
   .metrics-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  #view-settings div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  #view-settings .card[style*="grid-column: span 2"] {
+    grid-column: span 1 !important;
+  }
+  #subjects-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* 6. Collapse all 2-column inline form grids on mobile */
+  [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* 7. Tables on Mobile */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    margin-bottom: 12px;
+    border-radius: var(--radius-sm);
+  }
+  .table-container table {
+    min-width: 580px;
+    font-size: 12px;
+  }
+  .table-container th,
+  .table-container td {
+    padding: 8px 10px;
+  }
+
+  /* 8. Modals on Mobile - Bottom Sheet Style */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal-dialog {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: 94vh !important;
+    margin: 0 !important;
+    border-bottom: none !important;
+  }
+  .modal-dialog.lg {
+    max-width: 100% !important;
+  }
+  .modal-header {
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 10;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-body {
+    padding: 14px 16px;
+    max-height: 75vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-footer {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+  }
+  .modal-footer .btn {
+    flex: 1 1 auto;
+    padding: 10px;
+  }
+
+  /* 9. Flashcard Study & Ratings */
+  .flashcard-display-card {
+    min-height: 180px;
+    padding: 16px;
+  }
+  .flashcard-question-text {
+    font-size: 16px;
+  }
+  .flashcard-answer-text {
+    font-size: 14px;
   }
   .rating-bar {
     grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .btn-rating {
+    padding: 10px 6px;
+  }
+
+  /* 10. Exam Simulator on Mobile */
+  #modal-exam-simulator {
+    padding: 0;
+  }
+  #modal-exam-simulator .modal-dialog {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
+  .exam-option-card {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .topbar-actions .btn {
+    font-size: 10px;
+    padding: 5px 8px;
+  }
+  .rating-bar {
+    grid-template-columns: 1fr;
+  }
+  .lock-card {
+    padding: 24px 18px;
+    margin: 14px;
   }
 }

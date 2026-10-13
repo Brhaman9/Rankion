@@ -536,6 +536,8 @@ function navigateTo(viewName) {
 
   const sbSidebar = document.getElementById('app-sidebar');
   if (sbSidebar) sbSidebar.classList.remove('mobile-open');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (overlay) overlay.classList.remove('active');
 
   if (viewName === 'dashboard') loadDashboard();
   else if (viewName === 'subjects') loadSubjectsList();
@@ -554,7 +556,10 @@ function navigateTo(viewName) {
 }
 
 function toggleMobileSidebar() {
-  document.getElementById('app-sidebar').classList.toggle('mobile-open');
+  const sb = document.getElementById('app-sidebar');
+  if (sb) sb.classList.toggle('mobile-open');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (overlay) overlay.classList.toggle('active');
 }
 
 async function loadInitialData() {
@@ -661,7 +666,7 @@ async function loadDashboard() {
 
     // Recent Chapters in Dashboard
     const { data: chaps } = await sb.from('chapters').select('*, subjects(name)').order('updated_at', { ascending: false }).limit(6);
-    const chTable = document.getElementById('dashboard-chapters-table');
+    const chTable = document.getElementById('dashboard-chapter-table');
     if (chTable) {
       if (chaps && chaps.length > 0) {
         chTable.innerHTML = chaps.map(c => `
@@ -754,13 +759,23 @@ async function loadSubjectsList() {
 }
 
 function openSubjectModal(subject = null) {
-  document.getElementById('form-subject').reset();
-  document.getElementById('subject-edit-id').value = subject ? subject.id : '';
-  document.getElementById('modal-subject-title').textContent = subject ? 'Edit Subject' : 'Add Subject';
+  const form = document.getElementById('form-subject');
+  if (form) form.reset();
+  const idEl = document.getElementById('subject-edit-id');
+  if (idEl) idEl.value = subject ? subject.id : '';
+  const titleEl = document.getElementById('modal-subject-title');
+  if (titleEl) titleEl.textContent = subject ? 'Edit Subject' : 'Add Subject';
+  const nameEl = document.getElementById('subject-name');
+  const descEl = document.getElementById('subject-desc');
+  const colorEl = document.getElementById('subject-color');
   if (subject) {
-    document.getElementById('subject-name').value = subject.name;
-    document.getElementById('subject-desc').value = subject.description || '';
-    document.getElementById('subject-color').value = subject.color || '#2563eb';
+    if (nameEl) nameEl.value = subject.name || '';
+    if (descEl) descEl.value = subject.description || '';
+    if (colorEl) colorEl.value = subject.color || '#2563eb';
+  } else {
+    if (nameEl) nameEl.value = '';
+    if (descEl) descEl.value = '';
+    if (colorEl) colorEl.value = '#2563eb';
   }
   openModal('modal-subject');
 }
@@ -773,27 +788,33 @@ function editSubject(subjectId) {
 async function handleSubjectSubmit(event) {
   event.preventDefault();
   const sb = getSupabase();
-  if (!sb) return showToast('Supabase not connected', 'danger');
+  if (!sb) return showToast('Supabase not connected. Please configure in Settings.', 'danger');
 
-  const id = document.getElementById('subject-edit-id').value;
-  const name = document.getElementById('subject-name').value.trim();
-  const description = document.getElementById('subject-desc').value.trim();
-  const color = document.getElementById('subject-color').value;
+  const id = document.getElementById('subject-edit-id')?.value;
+  const name = document.getElementById('subject-name')?.value.trim();
+  const description = document.getElementById('subject-desc')?.value.trim() || '';
+  const color = document.getElementById('subject-color')?.value || '#2563eb';
+
+  if (!name) {
+    return showToast('Please enter a subject name.', 'warning');
+  }
 
   try {
     if (id) {
       const { error } = await sb.from('subjects').update({ name, description, color, updated_at: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
-      showToast('Subject updated.', 'success');
+      showToast('Subject updated successfully.', 'success');
     } else {
       const { error } = await sb.from('subjects').insert([{ name, description, color }]);
       if (error) throw error;
-      showToast('Subject created successfully.', 'success');
+      showToast('Subject created successfully!', 'success');
     }
     closeModal('modal-subject');
     await fetchSubjectsCache();
     await loadSubjectsList();
+    await refreshGlobalBadges();
   } catch (e) {
+    console.error('Subject creation error:', e);
     showToast(e.message || 'Failed to save subject.', 'danger');
   }
 }
@@ -827,10 +848,10 @@ async function loadChaptersList() {
     return;
   }
 
-  populateSubjectFilter('chapters-subject-filter');
+  populateSubjectFilter('chapter-subject-filter');
 
   try {
-    const subFilter = document.getElementById('chapters-subject-filter')?.value;
+    const subFilter = document.getElementById('chapter-subject-filter')?.value;
     let query = sb.from('chapters').select('*, subjects(name)').order('subject_id').order('order_index');
     if (subFilter) query = query.eq('subject_id', subFilter);
 
@@ -1452,15 +1473,21 @@ function renderCurrentStudyCard() {
   document.getElementById('study-answer-text').textContent = card.answer;
   document.getElementById('study-source-ref').textContent = card.source_reference ? `Ref: ${card.source_reference}` : '';
 
-  document.getElementById('study-answer-box').style.display = 'none';
-  document.getElementById('study-reveal-btn').style.display = 'block';
-  document.getElementById('study-rating-buttons').style.display = 'none';
+  const ansBox = document.getElementById('study-answer-box');
+  const revBtn = document.getElementById('study-reveal-control');
+  const rateBox = document.getElementById('study-rating-controls');
+  if (ansBox) ansBox.style.display = 'none';
+  if (revBtn) revBtn.style.display = 'block';
+  if (rateBox) rateBox.style.display = 'none';
 }
 
 function revealFlashcardAnswer() {
-  document.getElementById('study-answer-box').style.display = 'block';
-  document.getElementById('study-reveal-btn').style.display = 'none';
-  document.getElementById('study-rating-buttons').style.display = 'flex';
+  const ansBox = document.getElementById('study-answer-box');
+  const revBtn = document.getElementById('study-reveal-control');
+  const rateBox = document.getElementById('study-rating-controls');
+  if (ansBox) ansBox.style.display = 'block';
+  if (revBtn) revBtn.style.display = 'none';
+  if (rateBox) rateBox.style.display = 'flex';
 }
 
 async function submitCardRating(rating) {
@@ -1773,8 +1800,8 @@ async function handleStartTest(event) {
 
   const subject_id = parseInt(document.getElementById('test-subject-select').value) || null;
   const chapter_id = parseInt(document.getElementById('test-chapter-select').value) || null;
-  const num_questions = parseInt(document.getElementById('test-num-questions').value) || 20;
-  const time_limit = parseInt(document.getElementById('test-time-limit').value) || 30;
+  const num_questions = parseInt(document.getElementById('test-question-count')?.value) || 20;
+  const time_limit = Math.max(10, Math.round(num_questions * 1.2));
 
   try {
     let query = sb.from('practice_questions').select('*');
@@ -1884,7 +1911,7 @@ function renderExamQuestion() {
   if (!currentExamQuestions || currentExamQuestions.length === 0) return;
   const q = currentExamQuestions[currentExamQuestionIndex];
 
-  document.getElementById('exam-q-number').textContent = `Question ${currentExamQuestionIndex + 1} of ${currentExamQuestions.length}`;
+  const qNumEl = document.getElementById('exam-current-q-index'); if (qNumEl) qNumEl.textContent = `Question ${currentExamQuestionIndex + 1} of ${currentExamQuestions.length}`;
   document.getElementById('exam-q-text').textContent = q.question_text;
 
   const cont = document.getElementById('exam-options-container');
@@ -1902,7 +1929,7 @@ function renderExamQuestion() {
     }).join('');
   }
 
-  const markBtn = document.getElementById('exam-mark-btn');
+  const markBtn = document.getElementById('btn-mark-review');
   if (markBtn) markBtn.textContent = q.is_marked ? 'Unmark Review' : 'Mark for Review';
 
   renderExamPalette();
@@ -2062,12 +2089,19 @@ async function viewTestResults(attemptId) {
 
     if (!attempt) return;
 
-    document.getElementById('res-score').textContent = attempt.score;
-    document.getElementById('res-max').textContent = attempt.max_score;
-    document.getElementById('res-accuracy').textContent = `${attempt.accuracy || 0}%`;
-    document.getElementById('res-correct').textContent = attempt.correct_count || 0;
-    document.getElementById('res-incorrect').textContent = attempt.incorrect_count || 0;
-    document.getElementById('res-unanswered').textContent = attempt.unanswered_count || 0;
+    const scoreEl = document.getElementById('res-score-val');
+    if (scoreEl) scoreEl.textContent = attempt.score;
+    const maxEl = document.getElementById('res-max-score-sub');
+    if (maxEl) maxEl.textContent = `Max: ${attempt.max_score}`;
+    const accEl = document.getElementById('res-accuracy-val');
+    if (accEl) accEl.textContent = `${attempt.accuracy || 0}%`;
+    const timeEl = document.getElementById('res-time-sub');
+    if (timeEl) timeEl.textContent = `Time: ${formatTime(attempt.time_taken_seconds || 0)}`;
+    const corrEl = document.getElementById('res-correct-val');
+    if (corrEl) corrEl.textContent = attempt.correct_count || 0;
+    const incorrEl = document.getElementById('res-incorrect-val');
+    if (incorrEl) incorrEl.textContent = attempt.incorrect_count || 0;
+    
 
     const listCont = document.getElementById('test-breakdown-list');
     if (listCont && responses) {
@@ -2150,10 +2184,14 @@ async function loadMistakesList() {
 }
 
 function openMistakeEditModal(id, errorType, reflection, status) {
-  document.getElementById('mistake-edit-id').value = id;
-  document.getElementById('mistake-error-type').value = errorType || 'Unclassified';
-  document.getElementById('mistake-reflection').value = reflection || '';
-  document.getElementById('mistake-status').value = status || 'unresolved';
+  const idEl = document.getElementById('mistake-edit-id');
+  if (idEl) idEl.value = id;
+  const typeEl = document.getElementById('mistake-edit-type');
+  if (typeEl) typeEl.value = errorType || 'Unclassified';
+  const refEl = document.getElementById('mistake-edit-reflection');
+  if (refEl) refEl.value = reflection || '';
+  const statEl = document.getElementById('mistake-edit-status');
+  if (statEl) statEl.value = status || 'unresolved';
   openModal('modal-mistake-edit');
 }
 
@@ -2162,10 +2200,10 @@ async function handleMistakeEditSubmit(event) {
   const sb = getSupabase();
   if (!sb) return;
 
-  const id = document.getElementById('mistake-edit-id').value;
-  const error_type = document.getElementById('mistake-error-type').value;
-  const user_reflection = document.getElementById('mistake-reflection').value.trim();
-  const status = document.getElementById('mistake-status').value;
+  const id = document.getElementById('mistake-edit-id')?.value;
+  const error_type = document.getElementById('mistake-edit-type')?.value || 'Unclassified';
+  const user_reflection = document.getElementById('mistake-edit-reflection')?.value.trim() || '';
+  const status = document.getElementById('mistake-edit-status')?.value || 'unresolved';
 
   try {
     const { error } = await sb.from('mistakes').update({
@@ -2304,19 +2342,19 @@ async function handlePYQSubmit(event) {
   const sb = getSupabase();
   if (!sb) return showToast('Supabase not connected', 'danger');
 
-  const exam_name = document.getElementById('pyq-exam-name').value.trim();
-  const exam_year = document.getElementById('pyq-exam-year').value.trim();
-  const tier = document.getElementById('pyq-tier').value;
-  const shift = document.getElementById('pyq-shift').value.trim();
-  const subject_id = parseInt(document.getElementById('pyq-subject-select').value) || null;
-  const chapter_id = parseInt(document.getElementById('pyq-chapter-select').value) || null;
-  const question_text = document.getElementById('pyq-question-text').value.trim();
-  const optA = document.getElementById('pyq-opt-a').value.trim();
-  const optB = document.getElementById('pyq-opt-b').value.trim();
-  const optC = document.getElementById('pyq-opt-c').value.trim();
-  const optD = document.getElementById('pyq-opt-d').value.trim();
-  const correct_answer = document.getElementById('pyq-correct-answer').value;
-  const explanation = document.getElementById('pyq-explanation').value.trim();
+  const exam_name = document.getElementById('pyq-exam')?.value.trim() || 'SSC CHSL Tier 1';
+  const exam_year = document.getElementById('pyq-year')?.value.trim() || '2023';
+  const tier = 'Tier 1';
+  const shift = 'Shift 1';
+  const subject_id = parseInt(document.getElementById('pyq-subject-select')?.value) || null;
+  const chapter_id = parseInt(document.getElementById('pyq-chapter-select')?.value) || null;
+  const question_text = document.getElementById('pyq-q-text')?.value.trim() || '';
+  const optA = document.getElementById('pyq-opt-a')?.value.trim() || '';
+  const optB = document.getElementById('pyq-opt-b')?.value.trim() || '';
+  const optC = document.getElementById('pyq-opt-c')?.value.trim() || '';
+  const optD = document.getElementById('pyq-opt-d')?.value.trim() || '';
+  const correct_answer = document.getElementById('pyq-correct-select')?.value || 'A';
+  const explanation = document.getElementById('pyq-explanation')?.value.trim() || '';
 
   try {
     const { error } = await sb.from('pyqs').insert([{

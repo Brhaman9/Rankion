@@ -34,8 +34,11 @@
     <!-- Desktop Sidebar / Mobile Drawer -->
     <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-header">
-        <div class="brand-title">RANKION</div>
-        <span class="brand-badge">PREP PORTAL</span>
+        <div style="flex: 1;">
+          <div class="brand-title">RANKION</div>
+          <span class="brand-badge">PREP PORTAL</span>
+        </div>
+        <button class="mobile-close-sidebar-btn" onclick="toggleMobileSidebar()" title="Close Sidebar">&times;</button>
       </div>
 
       <nav class="sidebar-nav">
@@ -87,6 +90,9 @@
         <button class="btn btn-secondary btn-sm" onclick="lockWebsite()">Lock</button>
       </div>
     </aside>
+
+    <!-- Mobile Sidebar Dark Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
 
     <!-- Main Viewport Wrapper -->
     <div class="main-wrapper">
@@ -716,7 +722,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title" id="modal-subject-title">Add Subject</div>
-        <button class="modal-close" onclick="closeModal('modal-subject')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-subject')">&times;</button>
       </div>
       <form id="form-subject" onsubmit="handleSubjectSubmit(event)">
         <div class="modal-body">
@@ -728,6 +734,10 @@
           <div class="form-group">
             <label class="form-label">Description / Target Focus</label>
             <input type="text" id="subject-desc" class="form-control" placeholder="e.g. SSC CHSL Tier 1 & 2 Syllabus">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Subject Color Accent</label>
+            <input type="color" id="subject-color" value="#2563eb" style="width: 100%; height: 38px; padding: 2px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--bg-card);">
           </div>
         </div>
         <div class="modal-footer">
@@ -743,7 +753,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title" id="modal-chapter-title">Add Chapter</div>
-        <button class="modal-close" onclick="closeModal('modal-chapter')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-chapter')">&times;</button>
       </div>
       <form id="form-chapter" onsubmit="handleChapterSubmit(event)">
         <div class="modal-body">
@@ -785,7 +795,7 @@
     <div class="modal-dialog lg">
       <div class="modal-header">
         <div class="modal-title">Paste Study Notes</div>
-        <button class="modal-close" onclick="closeModal('modal-note-paste')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-note-paste')">&times;</button>
       </div>
       <form id="form-note-paste" onsubmit="handleNotePasteSubmit(event)">
         <div class="modal-body">
@@ -821,7 +831,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title">Upload Notes Document</div>
-        <button class="modal-close" onclick="closeModal('modal-note-upload')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-note-upload')">&times;</button>
       </div>
       <form id="form-note-upload" onsubmit="handleNoteUploadSubmit(event)">
         <div class="modal-body">
@@ -858,7 +868,7 @@
     <div class="modal-dialog lg">
       <div class="modal-header">
         <div class="modal-title" id="note-view-title">Note Details</div>
-        <button class="modal-close" onclick="closeModal('modal-note-view')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-note-view')">&times;</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="note-view-id">
@@ -885,7 +895,7 @@
     <div class="modal-dialog lg">
       <div class="modal-header">
         <div class="modal-title">Paste & Import Flashcards (Q&A)</div>
-        <button class="modal-close" onclick="closeModal('modal-flashcard-importer')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-flashcard-importer')">&times;</button>
       </div>
       <form id="form-flashcard-importer" onsubmit="handleFlashcardImportSubmit(event)">
         <div class="modal-body">
@@ -928,7 +938,7 @@
     <div class="modal-dialog lg">
       <div class="modal-header">
         <div class="modal-title">Paste & Import Practice Questions (MCQs)</div>
-        <button class="modal-close" onclick="closeModal('modal-question-importer')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-question-importer')">&times;</button>
       </div>
       <form id="form-question-importer" onsubmit="handleQuestionImportSubmit(event)">
         <div class="modal-body">
@@ -970,7 +980,7 @@
     <div class="modal-dialog" style="max-width: 680px;">
       <div class="modal-header">
         <div class="modal-title">Active Recall Revision (SM-2)</div>
-        <button class="modal-close" onclick="closeFlashcardStudyModal()">×</button>
+        <button class="modal-close" onclick="closeFlashcardStudyModal()">&times;</button>
       </div>
       <div class="modal-body" id="study-session-body">
         <div class="flashcard-session-container">
@@ -1050,7 +1060,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title">Configure Practice Test</div>
-        <button class="modal-close" onclick="closeModal('modal-test-config')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-test-config')">&times;</button>
       </div>
       <form id="form-test-config" onsubmit="handleStartTest(event)">
         <div class="modal-body">
@@ -1164,7 +1174,7 @@
     <div class="modal-dialog lg">
       <div class="modal-header">
         <div class="modal-title">Examination Scorecard & Detailed Solutions</div>
-        <button class="modal-close" onclick="closeModal('modal-test-results')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-test-results')">&times;</button>
       </div>
       <div class="modal-body">
         <div class="metrics-grid" style="margin-bottom: 20px;">
@@ -1205,7 +1215,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title">Classify Error & Add Reflection</div>
-        <button class="modal-close" onclick="closeModal('modal-mistake-edit')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-mistake-edit')">&times;</button>
       </div>
       <form id="form-mistake-edit" onsubmit="handleMistakeEditSubmit(event)">
         <div class="modal-body">
@@ -1246,7 +1256,7 @@
     <div class="modal-dialog lg">
       <div class="modal-header">
         <div class="modal-title">Add Authentic Previous Year Question (PYQ)</div>
-        <button class="modal-close" onclick="closeModal('modal-pyq')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-pyq')">&times;</button>
       </div>
       <form id="form-pyq" onsubmit="handlePYQSubmit(event)">
         <div class="modal-body">
@@ -1319,7 +1329,7 @@
     <div class="modal-dialog" style="max-width: 400px;">
       <div class="modal-header">
         <div class="modal-title" id="confirm-modal-title">Confirm Action</div>
-        <button class="modal-close" onclick="closeModal('modal-confirm')">×</button>
+        <button class="modal-close" onclick="closeModal('modal-confirm')">&times;</button>
       </div>
       <div class="modal-body" id="confirm-modal-msg">
         Are you sure you want to proceed?
