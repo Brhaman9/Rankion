@@ -113,7 +113,8 @@
           <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal()">+ Note</button>
           <button class="btn btn-secondary btn-sm" onclick="openFlashcardAddModal()">+ Flashcard</button>
           <button class="btn btn-secondary btn-sm" onclick="openQuestionAddModal()">+ Question</button>
-          <button class="btn btn-primary btn-sm" onclick="startDailyRevisionSession()">Revise Due Cards</button>
+          <button class="btn btn-primary btn-sm" onclick="openFlashcardPracticeModal()" title="Unlimited practice by chapter & subject">🎯 Practice Flashcards</button>
+          <button class="btn btn-secondary btn-sm" onclick="startDailyRevisionSession()" title="Revise cards scheduled for today by SM-2">Revise Due</button>
         </div>
       </header>
 
@@ -324,13 +325,17 @@
                 <div class="card-title">Flashcards Management</div>
                 <div class="card-desc">Active recall flashcards created from your questions and answers. Managed by SM-2 spaced repetition.</div>
               </div>
-              <div style="display: flex; gap: 8px;">
-                <select id="flashcard-chapter-filter" class="form-control" style="width: 200px;" onchange="loadFlashcardsList()">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <select id="flashcard-subject-filter" class="form-control" style="width: 170px;" onchange="handleFlashcardSubjectFilterChange()">
+                  <option value="">All Subjects</option>
+                </select>
+                <select id="flashcard-chapter-filter" class="form-control" style="width: 170px;" onchange="loadFlashcardsList()">
                   <option value="">All Chapters</option>
                 </select>
-                <button class="btn btn-primary btn-sm" onclick="openFlashcardAddModal()">+ Add Flashcard</button>
-                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">📁 Bulk Upload (Text / .txt)</button>
-                <button class="btn btn-primary btn-sm" onclick="startDailyRevisionSession()">Revise Due Cards</button>
+                <button class="btn btn-primary btn-sm" onclick="openFlashcardPracticeModal()" title="Free custom flashcard practice by subject & chapter">🎯 Practice Flashcards</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardAddModal()">+ Add Flashcard</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFlashcardImporterModal()">📁 Bulk Upload</button>
+                <button class="btn btn-secondary btn-sm" onclick="startDailyRevisionSession()" title="Revise cards scheduled for today by SM-2">Revise Due</button>
               </div>
             </div>
 
@@ -1135,11 +1140,84 @@
                 <div class="metric-val" style="color: var(--status-danger);" id="summary-lapse-count">0</div>
               </div>
             </div>
-            <button class="btn btn-primary" onclick="closeFlashcardStudyModal()">Done</button>
+            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" onclick="restartCurrentFlashcardPractice()">🔄 Practice Again</button>
+              <button type="button" class="btn btn-secondary" onclick="closeFlashcardStudyModal(); openFlashcardPracticeModal();">🎯 Practice Another Chapter</button>
+              <button type="button" class="btn btn-primary" onclick="closeFlashcardStudyModal()">Done</button>
+            </div>
           </div>
 
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Flashcard Practice Configuration Modal (Custom / Free Practice) -->
+  <div class="modal-backdrop" id="modal-flashcard-practice-config">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">🎯 Flashcard Practice Mode</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Practice as much as you want • Filter by Subject &amp; Chapter</div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-flashcard-practice-config')">&times;</button>
+      </div>
+      <form id="form-flashcard-practice-config" onsubmit="handleStartFlashcardPractice(event)">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Subject</label>
+              <select id="practice-subject-select" class="form-control" onchange="handlePracticeSubjectChange()">
+                <option value="">All Subjects</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Chapter</label>
+              <select id="practice-chapter-select" class="form-control" onchange="updatePracticeCardCount()">
+                <option value="">All Chapters</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Practice Scope</label>
+              <select id="practice-mode-select" class="form-control" onchange="updatePracticeCardCount()">
+                <option value="all" selected>All Cards (Unlimited Practice)</option>
+                <option value="due">Due Cards Only (SM-2 Spaced Repetition)</option>
+                <option value="lapsed">Difficult / Lapsed Cards (Past Errors)</option>
+                <option value="new">New Cards (Unreviewed)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Card Limit</label>
+              <select id="practice-card-limit" class="form-control">
+                <option value="all" selected>All Available (Unlimited)</option>
+                <option value="10">10 Cards</option>
+                <option value="20">20 Cards</option>
+                <option value="30">30 Cards</option>
+                <option value="50">50 Cards</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Card Order</label>
+            <select id="practice-card-order" class="form-control">
+              <option value="random" selected>Random Shuffle (Active Recall Best Practice)</option>
+              <option value="sequential">Sequential Order (Creation Order)</option>
+            </select>
+          </div>
+
+          <div id="practice-avail-count-msg" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; color: var(--accent-primary); font-weight: 500;">
+            Counting available cards...
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-flashcard-practice-config')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-start-flashcard-practice">Start Practice Session ⚡</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1265,10 +1343,35 @@
         <button class="modal-close" onclick="closeModal('modal-test-results')">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="metrics-grid" style="margin-bottom: 20px;">
+        <!-- Scorecard Test Info Banner -->
+        <div class="scorecard-banner">
+          <div>
+            <div class="scorecard-banner-title" id="res-test-title">Examination Scorecard</div>
+            <div class="scorecard-banner-sub" id="res-test-sub">
+              <span>SSC CHSL Tier 1 CBT Simulation</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="badge badge-green" id="res-test-status">COMPLETED</span>
+            <span class="badge badge-gray" id="res-test-duration">0m 0s</span>
+          </div>
+        </div>
+
+        <!-- SSC Marking Formula Strip -->
+        <div class="scorecard-ssc-formula">
+          <div>
+            <span style="font-weight: 700;">SSC CHSL Marking Scheme:</span> +2.0 marks per correct, -0.5 marks negative penalty per wrong answer.
+          </div>
+          <div style="font-weight: 700; font-family: monospace; font-size: 14px;" id="res-formula-calc">
+            Net Score: 0.00 / 0.00
+          </div>
+        </div>
+
+        <!-- 6 Metrics Grid -->
+        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-bottom: 20px;">
           <div class="metric-card">
-            <div class="metric-label">Total Score</div>
-            <div class="metric-val" id="res-score-val">0</div>
+            <div class="metric-label">Net Score</div>
+            <div class="metric-val" style="color: var(--accent-primary);" id="res-score-val">0</div>
             <div class="metric-sub" id="res-max-score-sub">Max: 0</div>
           </div>
           <div class="metric-card">
@@ -1279,17 +1382,38 @@
           <div class="metric-card">
             <div class="metric-label">Correct Answers</div>
             <div class="metric-val" style="color: var(--status-success);" id="res-correct-val">0</div>
+            <div class="metric-sub" id="res-correct-marks-sub">+0.0 Marks</div>
           </div>
           <div class="metric-card">
             <div class="metric-label">Incorrect Answers</div>
             <div class="metric-val" style="color: var(--status-danger);" id="res-incorrect-val">0</div>
-            <div class="metric-sub">Added to Mistake Notebook</div>
+            <div class="metric-sub" id="res-incorrect-penalty-sub">-0.0 Penalty</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Unanswered</div>
+            <div class="metric-val" style="color: var(--text-muted);" id="res-unanswered-val">0</div>
+            <div class="metric-sub">0 Marks</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Avg Speed</div>
+            <div class="metric-val" style="font-size: 20px;" id="res-avg-time-val">0s</div>
+            <div class="metric-sub" id="res-avg-time-sub">per question</div>
           </div>
         </div>
 
-        <div style="font-weight: 600; font-size: 14px; margin-bottom: 12px;">Question Analysis & Explanations</div>
+        <!-- Filter Tabs for Question Breakdown -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div style="font-weight: 700; font-size: 15px;">Question Analysis &amp; Solutions</div>
+          <div class="scorecard-filter-tabs" style="margin-bottom: 0;">
+            <button type="button" class="scorecard-pill active" id="scorecard-pill-all" onclick="filterScorecardView('all')">All (<span id="scorecard-count-all">0</span>)</button>
+            <button type="button" class="scorecard-pill" id="scorecard-pill-incorrect" onclick="filterScorecardView('incorrect')" style="color: #ef4444;">❌ Mistakes (<span id="scorecard-count-incorrect">0</span>)</button>
+            <button type="button" class="scorecard-pill" id="scorecard-pill-correct" onclick="filterScorecardView('correct')" style="color: #10b981;">✓ Correct (<span id="scorecard-count-correct">0</span>)</button>
+            <button type="button" class="scorecard-pill" id="scorecard-pill-unanswered" onclick="filterScorecardView('unanswered')">⊘ Unanswered (<span id="scorecard-count-unanswered">0</span>)</button>
+          </div>
+        </div>
+
         <div id="test-breakdown-list" style="display: flex; flex-direction: column; gap: 14px;">
-          <!-- Solutions -->
+          <!-- Complete Solutions with Options -->
         </div>
       </div>
       <div class="modal-footer">

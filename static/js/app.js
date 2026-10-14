@@ -13,6 +13,12 @@ let studyQueue = [];
 let currentStudyIndex = 0;
 let studySessionStats = { total: 0, correct: 0, lapses: 0 };
 let cardStartTime = 0;
+let currentStudyConfig = null;
+
+// Scorecard & Results State
+let currentScorecardAttempt = null;
+let currentScorecardResponses = [];
+let currentScorecardFilter = 'all';
 
 // Exam Simulator State
 let currentExamAttempt = null;
@@ -1069,6 +1075,7 @@ async function loadChaptersList() {
         </td>
         <td>
           <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+            <button class="btn btn-primary btn-sm" onclick="openFlashcardPracticeModal(${c.subject_id}, ${c.id})" title="Practice flashcards for this chapter">🎯 Practice Cards</button>
             <button class="btn btn-secondary btn-sm" onclick="openFlashcardAddModal(${c.subject_id}, ${c.id})">+ Card</button>
             <button class="btn btn-secondary btn-sm" onclick="openQuestionAddModal(${c.subject_id}, ${c.id})">+ MCQ</button>
             <button class="btn btn-secondary btn-sm" onclick="openNotePasteModal(${c.subject_id}, ${c.id})">+ Note</button>
@@ -1386,12 +1393,17 @@ async function loadFlashcardsList() {
     return;
   }
 
-  populateChapterFilter('flashcard-chapter-filter');
+  populateSubjectFilter('flashcard-subject-filter');
 
   try {
+    const subFilter = document.getElementById('flashcard-subject-filter')?.value;
     const chapFilter = document.getElementById('flashcard-chapter-filter')?.value;
     let query = sb.from('flashcards').select('*, subjects(name), chapters(name)').order('id', { ascending: false });
-    if (chapFilter) query = query.eq('chapter_id', chapFilter);
+    if (chapFilter) {
+      query = query.eq('chapter_id', chapFilter);
+    } else if (subFilter) {
+      query = query.eq('subject_id', subFilter);
+    }
 
     const { data: cards, error } = await query;
     if (error) throw error;
@@ -1428,6 +1440,12 @@ async function loadFlashcardsList() {
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: #ef4444;">Failed to load flashcards: ${e.message}</td></tr>`;
   }
+}
+
+async function handleFlashcardSubjectFilterChange() {
+  const subId = document.getElementById('flashcard-subject-filter')?.value;
+  await populateChapterFilter('flashcard-chapter-filter', subId ? parseInt(subId, 10) : null);
+  loadFlashcardsList();
 }
 
 // Add Single Flashcard
@@ -1632,7 +1650,131 @@ function calculateSM2(rating, repetitions, intervalDays, easeFactor) {
   };
 }
 
-// Interactive Flashcard Study Session (SM-2)
+// ==========================================================================
+// FLASHCARD PRACTICE & ACTIVE RECALL (FREE PRACTICE & SM-2)
+// ==========================================================================
+
+function openFlashcardPracticeModal(preSubId = null, preChapId = null) {
+  populateSubjectSelect('practice-subject-select', preSubId);
+  populateChapterSelect('practice-subject-select', 'practice-chapter-select', preChapId);
+  updatePracticeCardCount();
+  openModal('modal-flashcard-practice-config');
+}
+
+function handlePracticeSubjectChange() {
+  populateChapterSelect('practice-subject-select', 'practice-chapter-select', null);
+  updatePracticeCardCount();
+}
+
+async function updatePracticeCardCount() {
+  const sb = getSupabase();
+  const msgEl = document.getElementById('practice-avail-count-msg');
+  if (!msgEl) return;
+  if (!sb) {
+    msgEl.textContent = 'Connect Supabase in Settings to practice flashcards.';
+    return;
+  }
+
+  const subId = parseInt(document.getElementById('practice-subject-select')?.value, 10) || null;
+  const chapId = parseInt(document.getElementById('practice-chapter-select')?.value, 10) || null;
+  const mode = document.getElementById('practice-mode-select')?.value || 'all';
+
+  try {
+    let query = sb.from('flashcards').select('id', { count: 'exact', head: true });
+    if (chapId) query = query.eq('chapter_id', chapId);
+    else if (subId) query = query.eq('subject_id', subId);
+
+    if (mode === 'due') {
+      const today = new Date().toISOString().split('T')[0];
+      query = query.lte('due_date', today);
+    } else if (mode === 'lapsed') {
+      query = query.gt('lapses', 0);
+    } else if (mode === 'new') {
+      query = query.eq('repetitions', 0);
+    }
+
+    const { count, error } = await query;
+    if (error) throw error;
+    msgEl.innerHTML = `🎯 <strong>${count || 0}</strong> flashcard(s) available matching this selection.`;
+  } catch (e) {
+    msgEl.textContent = 'Ready to practice.';
+  }
+}
+
+async function handleStartFlashcardPractice(event) {
+  event.preventDefault();
+  const sb = getSupabase();
+  if (!sb) return showToast('Supabase not connected', 'danger');
+
+  const subId = parseInt(document.getElementById('practice-subject-select')?.value, 10) || null;
+  const chapId = parseInt(document.getElementById('practice-chapter-select')?.value, 10) || null;
+  const mode = document.getElementById('practice-mode-select')?.value || 'all';
+  const limitVal = document.getElementById('practice-card-limit')?.value || 'all';
+  const orderVal = document.getElementById('practice-card-order')?.value || 'random';
+
+  try {
+    let query = sb.from('flashcards').select('*, subjects(name), chapters(name)');
+    if (chapId) query = query.eq('chapter_id', chapId);
+    else if (subId) query = query.eq('subject_id', subId);
+
+    const today = new Date().toISOString().split('T')[0];
+    if (mode === 'due') {
+      query = query.lte('due_date', today);
+    } else if (mode === 'lapsed') {
+      query = query.gt('lapses', 0);
+    } else if (mode === 'new') {
+      query = query.eq('repetitions', 0);
+    }
+
+    const { data: cards, error } = await query;
+    if (error) throw error;
+
+    if (!cards || cards.length === 0) {
+      if (mode === 'due') {
+        showToast('No cards strictly due today for this selection. Choose "All Cards (Unlimited Practice)" to practice freely as much as you want!', 'warning');
+      } else {
+        showToast('No flashcards found for this selection. Please add cards or choose another chapter/subject!', 'warning');
+      }
+      return;
+    }
+
+    let finalCards = [...cards];
+    if (orderVal === 'random') {
+      finalCards.sort(() => 0.5 - Math.random());
+    }
+
+    if (limitVal !== 'all') {
+      const numLimit = parseInt(limitVal, 10);
+      if (numLimit > 0) finalCards = finalCards.slice(0, numLimit);
+    }
+
+    currentStudyConfig = { subId, chapId, mode, limitVal, orderVal };
+    studyQueue = finalCards;
+    currentStudyIndex = 0;
+    studySessionStats = { total: finalCards.length, correct: 0, lapses: 0 };
+    cardStartTime = Date.now();
+
+    closeModal('modal-flashcard-practice-config');
+    renderCurrentStudyCard();
+    openModal('modal-flashcard-study');
+  } catch (e) {
+    showToast('Failed to start practice: ' + e.message, 'danger');
+  }
+}
+
+function restartCurrentFlashcardPractice() {
+  if (!studyQueue || studyQueue.length === 0) return;
+  studyQueue.sort(() => 0.5 - Math.random());
+  currentStudyIndex = 0;
+  studySessionStats = { total: studyQueue.length, correct: 0, lapses: 0 };
+  cardStartTime = Date.now();
+
+  const summaryView = document.getElementById('study-summary-view');
+  if (summaryView) summaryView.style.display = 'none';
+
+  renderCurrentStudyCard();
+}
+
 async function startDailyRevisionSession() {
   const sb = getSupabase();
   if (!sb) return showToast('Supabase not connected.', 'danger');
@@ -1646,10 +1788,12 @@ async function startDailyRevisionSession() {
 
     if (error) throw error;
     if (!cards || cards.length === 0) {
-      showToast('No cards due for revision today! Great job.', 'success');
+      showToast('No cards strictly due today under SM-2 schedule! Opening Practice Mode so you can practice freely as much as you want...', 'info');
+      openFlashcardPracticeModal();
       return;
     }
 
+    currentStudyConfig = { mode: 'due' };
     studyQueue = cards;
     currentStudyIndex = 0;
     studySessionStats = { total: cards.length, correct: 0, lapses: 0 };
@@ -1663,6 +1807,12 @@ async function startDailyRevisionSession() {
 }
 
 function renderCurrentStudyCard() {
+  const summaryView = document.getElementById('study-summary-view');
+  if (summaryView) summaryView.style.display = 'none';
+
+  const cardCont = document.querySelector('.flashcard-display-card');
+  if (cardCont) cardCont.style.display = 'block';
+
   if (currentStudyIndex >= studyQueue.length) {
     finishStudySession();
     return;
@@ -1671,12 +1821,27 @@ function renderCurrentStudyCard() {
   const card = studyQueue[currentStudyIndex];
   cardStartTime = Date.now();
 
-  document.getElementById('study-card-counter').textContent = `Card ${currentStudyIndex + 1} of ${studyQueue.length}`;
-  document.getElementById('study-card-chapter').textContent = `${card.subjects?.name || ''} &bull; ${card.chapters?.name || ''}`;
-  document.getElementById('study-card-type').textContent = (card.card_type || 'CONCEPT').toUpperCase();
-  document.getElementById('study-question-text').textContent = card.question;
-  document.getElementById('study-answer-text').textContent = card.answer;
-  document.getElementById('study-source-ref').textContent = card.source_reference ? `Ref: ${card.source_reference}` : '';
+  const counterEl = document.getElementById('study-card-counter');
+  if (counterEl) counterEl.textContent = `Card ${currentStudyIndex + 1} of ${studyQueue.length}`;
+  
+  const chapEl = document.getElementById('study-card-chapter');
+  if (chapEl) {
+    const subName = card.subjects?.name || '';
+    const chapName = card.chapters?.name || '';
+    chapEl.innerHTML = `${escapeHtml(subName)} &bull; ${escapeHtml(chapName)}`;
+  }
+
+  const typeEl = document.getElementById('study-card-type');
+  if (typeEl) typeEl.textContent = (card.card_type || 'CONCEPT').toUpperCase();
+
+  const qEl = document.getElementById('study-question-text');
+  if (qEl) qEl.textContent = card.question;
+
+  const aEl = document.getElementById('study-answer-text');
+  if (aEl) aEl.textContent = card.answer;
+
+  const refEl = document.getElementById('study-source-ref');
+  if (refEl) refEl.textContent = card.source_reference ? `Ref: ${card.source_reference}` : '';
 
   const ansBox = document.getElementById('study-answer-box');
   const revBtn = document.getElementById('study-reveal-control');
@@ -1741,8 +1906,33 @@ async function submitCardRating(rating) {
 }
 
 function finishStudySession() {
-  closeModal('modal-flashcard-study');
-  showToast(`Revision session completed! Reviewed ${studySessionStats.total} cards (${studySessionStats.correct} correct).`, 'success');
+  const cardCont = document.querySelector('.flashcard-display-card');
+  if (cardCont) cardCont.style.display = 'none';
+
+  const ansBox = document.getElementById('study-answer-box');
+  const revBtn = document.getElementById('study-reveal-control');
+  const rateBox = document.getElementById('study-rating-controls');
+  const summaryView = document.getElementById('study-summary-view');
+
+  if (ansBox) ansBox.style.display = 'none';
+  if (revBtn) revBtn.style.display = 'none';
+  if (rateBox) rateBox.style.display = 'none';
+
+  if (summaryView) {
+    summaryView.style.display = 'block';
+    const revEl = document.getElementById('summary-reviewed-count');
+    if (revEl) revEl.textContent = studySessionStats.total;
+    const corrEl = document.getElementById('summary-correct-count');
+    if (corrEl) corrEl.textContent = studySessionStats.correct;
+    const lapseEl = document.getElementById('summary-lapse-count');
+    if (lapseEl) lapseEl.textContent = studySessionStats.lapses;
+    const msgEl = document.getElementById('study-summary-msg');
+    if (msgEl) msgEl.textContent = `Completed practice of ${studySessionStats.total} cards!`;
+  } else {
+    closeModal('modal-flashcard-study');
+    showToast(`Practice session completed! Reviewed ${studySessionStats.total} cards (${studySessionStats.correct} correct).`, 'success');
+  }
+
   refreshGlobalBadges();
   loadFlashcardsList();
   if (currentView === 'dashboard') loadDashboard();
@@ -2308,49 +2498,244 @@ async function finalizeTestSubmission() {
 
 async function viewTestResults(attemptId) {
   const sb = getSupabase();
-  if (!sb) return;
+  if (!sb) return showToast('Database connection not established', 'danger');
 
   try {
-    const { data: attempt } = await sb.from('test_attempts').select('*, subjects(name), chapters(name)').eq('id', attemptId).single();
-    const { data: responses } = await sb.from('test_responses').select('*, practice_questions(*)').eq('attempt_id', attemptId);
+    // 1. Fetch attempt with resilient fallback
+    let attempt = null;
+    const { data: attWithJoins, error: joinErr } = await sb.from('test_attempts')
+      .select('*, subjects(name), chapters(name)')
+      .eq('id', attemptId)
+      .single();
 
-    if (!attempt) return;
+    if (attWithJoins && !joinErr) {
+      attempt = attWithJoins;
+    } else {
+      const { data: rawAtt, error: rawErr } = await sb.from('test_attempts')
+        .select('*')
+        .eq('id', attemptId)
+        .single();
+      if (rawErr || !rawAtt) throw new Error('Attempt record not found');
+      attempt = rawAtt;
+      const sub = subjectsCache.find(s => s.id === attempt.subject_id);
+      const chap = chaptersCache.find(c => c.id === attempt.chapter_id);
+      attempt.subjects = sub ? { name: sub.name } : null;
+      attempt.chapters = chap ? { name: chap.name } : null;
+    }
 
+    // 2. Fetch responses with practice_questions
+    let responses = [];
+    const { data: respWithJoins, error: respJoinErr } = await sb.from('test_responses')
+      .select('*, practice_questions(*)')
+      .eq('attempt_id', attemptId)
+      .order('id', { ascending: true });
+
+    if (respWithJoins && !respJoinErr) {
+      responses = respWithJoins;
+    } else {
+      const { data: rawResp } = await sb.from('test_responses')
+        .select('*')
+        .eq('attempt_id', attemptId)
+        .order('id', { ascending: true });
+      responses = rawResp || [];
+    }
+
+    // Fill missing practice_questions if join was partial
+    const missingQIds = responses.filter(r => !r.practice_questions || !r.practice_questions.question_text).map(r => r.question_id);
+    if (missingQIds.length > 0) {
+      const { data: qs } = await sb.from('practice_questions').select('*').in('id', missingQIds);
+      if (qs && qs.length > 0) {
+        const qMap = {};
+        qs.forEach(q => { qMap[q.id] = q; });
+        responses.forEach(r => {
+          if (!r.practice_questions || !r.practice_questions.question_text) {
+            r.practice_questions = qMap[r.question_id] || {};
+          }
+        });
+      }
+    }
+
+    currentScorecardAttempt = attempt;
+    currentScorecardResponses = responses;
+    currentScorecardFilter = 'all';
+
+    const corrCount = attempt.correct_count || 0;
+    const incorrCount = attempt.incorrect_count || 0;
+    const totalQ = attempt.question_count || responses.length || 0;
+    const unansweredCount = (attempt.unanswered_count !== undefined && attempt.unanswered_count !== null)
+      ? attempt.unanswered_count
+      : Math.max(0, totalQ - corrCount - incorrCount);
+
+    const timeSec = attempt.time_taken_seconds || 0;
+    const avgSecPerQ = totalQ > 0 ? Math.round(timeSec / totalQ) : 0;
+
+    // Header Info
+    const titleEl = document.getElementById('res-test-title');
+    if (titleEl) titleEl.textContent = attempt.title || 'Examination Scorecard';
+    const subEl = document.getElementById('res-test-sub');
+    if (subEl) {
+      const subName = attempt.subjects?.name || 'All Subjects';
+      const chapName = attempt.chapters?.name || 'Full Practice';
+      const dateStr = attempt.completed_at ? new Date(attempt.completed_at).toLocaleString() : 'In Progress';
+      subEl.innerHTML = `<span><strong>${escapeHtml(subName)}</strong> &bull; ${escapeHtml(chapName)} &bull; ${dateStr}</span>`;
+    }
+    const statusEl = document.getElementById('res-test-status');
+    if (statusEl) {
+      statusEl.textContent = (attempt.status || 'Completed').toUpperCase();
+      statusEl.className = attempt.status === 'completed' ? 'badge badge-green' : 'badge badge-amber';
+    }
+    const durEl = document.getElementById('res-test-duration');
+    if (durEl) durEl.textContent = formatTime(timeSec);
+
+    // SSC formula breakdown
+    const formulaEl = document.getElementById('res-formula-calc');
+    if (formulaEl) {
+      const corrMarks = (corrCount * 2).toFixed(1);
+      const incorrPenalty = (incorrCount * 0.5).toFixed(1);
+      formulaEl.textContent = `(+${corrMarks}) - (-${incorrPenalty}) = ${attempt.score} / ${attempt.max_score}`;
+    }
+
+    // 6 Metrics
     const scoreEl = document.getElementById('res-score-val');
     if (scoreEl) scoreEl.textContent = attempt.score;
     const maxEl = document.getElementById('res-max-score-sub');
     if (maxEl) maxEl.textContent = `Max: ${attempt.max_score}`;
+
     const accEl = document.getElementById('res-accuracy-val');
     if (accEl) accEl.textContent = `${attempt.accuracy || 0}%`;
     const timeEl = document.getElementById('res-time-sub');
-    if (timeEl) timeEl.textContent = `Time: ${formatTime(attempt.time_taken_seconds || 0)}`;
+    if (timeEl) timeEl.textContent = `Time: ${formatTime(timeSec)}`;
+
     const corrEl = document.getElementById('res-correct-val');
-    if (corrEl) corrEl.textContent = attempt.correct_count || 0;
+    if (corrEl) corrEl.textContent = corrCount;
+    const corrMarksEl = document.getElementById('res-correct-marks-sub');
+    if (corrMarksEl) corrMarksEl.textContent = `+${(corrCount * 2).toFixed(1)} Marks`;
+
     const incorrEl = document.getElementById('res-incorrect-val');
-    if (incorrEl) incorrEl.textContent = attempt.incorrect_count || 0;
-    
+    if (incorrEl) incorrEl.textContent = incorrCount;
+    const incorrPenEl = document.getElementById('res-incorrect-penalty-sub');
+    if (incorrPenEl) incorrPenEl.textContent = `-${(incorrCount * 0.5).toFixed(1)} Penalty`;
 
-    const listCont = document.getElementById('test-breakdown-list');
-    if (listCont && responses) {
-      listCont.innerHTML = responses.map((r, i) => {
-        const q = r.practice_questions || {};
-        const isCorrect = r.is_correct === 1;
-        return `
-          <div style="padding: 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); border-left: 4px solid ${isCorrect ? '#10b981' : (r.user_answer ? '#ef4444' : '#6b7280')};">
-            <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">Q${i + 1}: ${escapeHtml(q.question_text || '')}</div>
-            <div style="font-size: 12px; margin-bottom: 4px;">
-              Your Answer: <strong style="color: ${isCorrect ? '#10b981' : '#ef4444'};">${r.user_answer || 'Unanswered'}</strong> | Correct: <strong style="color: #10b981;">${q.correct_answer || ''}</strong>
-            </div>
-            ${q.explanation ? `<div style="font-size: 12px; color: var(--text-muted); background: var(--bg-surface); padding: 6px 10px; border-radius: 4px; margin-top: 6px;">Sol: ${escapeHtml(q.explanation)}</div>` : ''}
-          </div>
-        `;
-      }).join('');
-    }
+    const unansEl = document.getElementById('res-unanswered-val');
+    if (unansEl) unansEl.textContent = unansweredCount;
 
+    const avgEl = document.getElementById('res-avg-time-val');
+    if (avgEl) avgEl.textContent = `${avgSecPerQ}s`;
+
+    // Filter pill counts
+    const countAllEl = document.getElementById('scorecard-count-all');
+    if (countAllEl) countAllEl.textContent = responses.length;
+    const countIncEl = document.getElementById('scorecard-count-incorrect');
+    if (countIncEl) countIncEl.textContent = incorrCount;
+    const countCorrEl = document.getElementById('scorecard-count-correct');
+    if (countCorrEl) countCorrEl.textContent = corrCount;
+    const countUnansEl = document.getElementById('scorecard-count-unanswered');
+    if (countUnansEl) countUnansEl.textContent = unansweredCount;
+
+    // Reset filter pills styling
+    ['all', 'incorrect', 'correct', 'unanswered'].forEach(type => {
+      const pill = document.getElementById(`scorecard-pill-${type}`);
+      if (pill) {
+        if (type === 'all') pill.classList.add('active');
+        else pill.classList.remove('active');
+      }
+    });
+
+    renderScorecardBreakdown();
     openModal('modal-test-results');
   } catch (e) {
     showToast('Failed to load scorecard: ' + e.message, 'danger');
   }
+}
+
+function filterScorecardView(filterType) {
+  currentScorecardFilter = filterType;
+  ['all', 'incorrect', 'correct', 'unanswered'].forEach(type => {
+    const pill = document.getElementById(`scorecard-pill-${type}`);
+    if (pill) {
+      if (type === filterType) pill.classList.add('active');
+      else pill.classList.remove('active');
+    }
+  });
+  renderScorecardBreakdown();
+}
+
+function renderScorecardBreakdown() {
+  const listCont = document.getElementById('test-breakdown-list');
+  if (!listCont || !currentScorecardResponses) return;
+
+  const filtered = currentScorecardResponses.filter(r => {
+    const isCorrect = r.is_correct === 1;
+    const isAnswered = Boolean(r.user_answer && String(r.user_answer).trim());
+    if (currentScorecardFilter === 'correct') return isCorrect;
+    if (currentScorecardFilter === 'incorrect') return (!isCorrect && isAnswered);
+    if (currentScorecardFilter === 'unanswered') return !isAnswered;
+    return true; // 'all'
+  });
+
+  if (filtered.length === 0) {
+    listCont.innerHTML = `<div style="text-align:center; color: var(--text-muted); padding: 30px;">No questions matching this filter.</div>`;
+    return;
+  }
+
+  listCont.innerHTML = filtered.map(r => {
+    const q = r.practice_questions || {};
+    const options = q.options_json;
+    const isCorrect = r.is_correct === 1;
+    const isAnswered = Boolean(r.user_answer && String(r.user_answer).trim());
+
+    const userDet = resolveOptionDetails(r.user_answer, options);
+    const corrDet = resolveOptionDetails(q.correct_answer, options);
+    const optionsGridHtml = renderCompleteOptionsGrid(options, r.user_answer, q.correct_answer);
+
+    let statusBadge = '';
+    let borderColor = '#6b7280';
+    if (isCorrect) {
+      statusBadge = '<span class="badge badge-green" style="font-weight:700;">+2.0 Marks ✓</span>';
+      borderColor = '#10b981';
+    } else if (isAnswered) {
+      statusBadge = '<span class="badge badge-red" style="font-weight:700;">-0.5 Penalty ✗</span>';
+      borderColor = '#ef4444';
+    } else {
+      statusBadge = '<span class="badge badge-gray" style="font-weight:700;">0.0 Unanswered ⊘</span>';
+      borderColor = '#9ca3af';
+    }
+
+    const originalIdx = currentScorecardResponses.indexOf(r) + 1;
+
+    return `
+      <div style="padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); border-left: 5px solid ${borderColor}; background: var(--bg-card);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 8px; flex-wrap: wrap;">
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-main);">
+            Question ${originalIdx}: ${escapeHtml(q.question_text || 'Question removed')}
+          </div>
+          <div>${statusBadge}</div>
+        </div>
+
+        <!-- Answers Summary Bar -->
+        <div class="answers-summary-bar">
+          <div class="answers-summary-pill" style="color: ${isCorrect ? '#10b981' : (isAnswered ? '#ef4444' : 'var(--text-muted)')};">
+            <span>Your Answer:</span>
+            <span style="font-weight: 700;">${isAnswered ? escapeHtml(userDet.full) : 'Unanswered / Skipped'}</span>
+          </div>
+          <div style="color: var(--border);">|</div>
+          <div class="answers-summary-pill" style="color: #10b981;">
+            <span>✓ Correct Answer:</span>
+            <span style="font-weight: 700;">${escapeHtml(corrDet.full)}</span>
+          </div>
+        </div>
+
+        <!-- Complete Options Grid -->
+        ${optionsGridHtml}
+
+        ${q.explanation ? `
+          <div style="font-size: 12px; color: var(--text-muted); background: var(--bg-surface); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-top: 8px;">
+            <strong style="color: var(--text-main);">Explanation:</strong> ${escapeHtml(q.explanation)}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 // ==========================================================================
@@ -2367,10 +2752,17 @@ async function loadMistakesList() {
   }
 
   try {
-    const { data: mistakes, error } = await sb.from('mistakes')
-      .select('*, subjects(name), chapters(name), practice_questions(question_text, options_json, correct_answer)')
+    const statusFilter = document.getElementById('mistake-status-filter')?.value;
+    const typeFilter = document.getElementById('mistake-type-filter')?.value;
+
+    let query = sb.from('mistakes')
+      .select('*, subjects(name), chapters(name), practice_questions(question_text, options_json, correct_answer, explanation)')
       .order('id', { ascending: false });
 
+    if (statusFilter) query = query.eq('status', statusFilter);
+    if (typeFilter) query = query.eq('error_type', typeFilter);
+
+    const { data: mistakes, error } = await query;
     if (error) throw error;
 
     if (!mistakes || mistakes.length === 0) {
@@ -2380,15 +2772,21 @@ async function loadMistakesList() {
 
     cont.innerHTML = mistakes.map(m => {
       const q = m.practice_questions || {};
+      const options = q.options_json;
       const isMastered = m.status === 'mastered';
 
+      const userDet = resolveOptionDetails(m.user_selected_answer, options);
+      const corrDet = resolveOptionDetails(m.correct_answer || q.correct_answer, options);
+      const optionsGridHtml = renderCompleteOptionsGrid(options, m.user_selected_answer, m.correct_answer || q.correct_answer);
+
       return `
-        <div class="mistake-card" style="border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 12px; background: var(--bg-surface); opacity: ${isMastered ? 0.6 : 1};">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div class="mistake-card" style="border: 1px solid var(--border); padding: 18px; border-radius: var(--radius-md); margin-bottom: 14px; background: var(--bg-surface); opacity: ${isMastered ? 0.65 : 1};">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 8px; flex-wrap: wrap;">
             <div>
-              <span class="badge badge-amber">${m.error_type || 'Unclassified'}</span>
+              <span class="badge badge-amber">${escapeHtml(m.error_type || 'Unclassified')}</span>
               <span class="badge ${isMastered ? 'badge-green' : 'badge-red'}">${isMastered ? 'Mastered' : 'Unresolved'}</span>
-              <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${m.subjects?.name || ''} &bull; ${m.chapters?.name || ''}</span>
+              ${m.repeated_count > 1 ? `<span class="badge badge-red" title="Failed ${m.repeated_count} times">Repeated ×${m.repeated_count}</span>` : ''}
+              <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(m.subjects?.name || '')} &bull; ${escapeHtml(m.chapters?.name || '')}</span>
             </div>
             <div style="display: flex; gap: 6px;">
               <button class="btn btn-secondary btn-sm" onclick="openMistakeEditModal(${m.id}, '${escapeJsString(m.error_type || '')}', '${escapeJsString(m.user_reflection || '')}', '${m.status}')">Reflect / Classify</button>
@@ -2396,12 +2794,42 @@ async function loadMistakesList() {
               <button class="btn btn-danger btn-sm" onclick="confirmDeleteMistake(${m.id})">Del</button>
             </div>
           </div>
-          <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px;">${escapeHtml(q.question_text || 'Question removed')}</div>
-          <div style="font-size: 12px; margin-bottom: 6px;">
-            Your Answer: <strong style="color: #ef4444;">${m.user_selected_answer}</strong> | Correct: <strong style="color: #10b981;">${m.correct_answer || q.correct_answer}</strong>
+
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--text-main);">
+            ${escapeHtml(q.question_text || 'Question removed')}
           </div>
-          ${m.explanation ? `<div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;"><strong>Explanation:</strong> ${escapeHtml(m.explanation)}</div>` : ''}
-          ${m.user_reflection ? `<div style="font-size: 12px; color: var(--accent-primary); font-style: italic; background: var(--bg-page); padding: 6px 10px; border-radius: 4px;">Reflection: "${escapeHtml(m.user_reflection)}"</div>` : ''}
+
+          <!-- Complete Answer Summary Bar -->
+          <div class="answers-summary-bar">
+            <div class="answers-summary-pill" style="color: #ef4444;">
+              <span>❌ Your Answer:</span>
+              <span style="font-weight: 700;">${escapeHtml(userDet.full)}</span>
+            </div>
+            <div style="color: var(--border);">|</div>
+            <div class="answers-summary-pill" style="color: #10b981;">
+              <span>✓ Correct Answer:</span>
+              <span style="font-weight: 700;">${escapeHtml(corrDet.full)}</span>
+            </div>
+          </div>
+
+          <!-- Complete Options Breakdown -->
+          ${optionsGridHtml}
+
+          ${(m.explanation || q.explanation) ? `
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; background: var(--bg-card); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+              <strong>Explanation:</strong> ${escapeHtml(m.explanation || q.explanation)}
+            </div>
+          ` : ''}
+
+          ${m.user_reflection ? `
+            <div style="font-size: 12px; color: var(--accent-primary); font-style: italic; background: var(--bg-page); padding: 8px 12px; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-primary);">
+              <strong>Reflection &amp; Rule:</strong> "${escapeHtml(m.user_reflection)}"
+            </div>
+          ` : `
+            <div style="font-size: 11px; color: var(--text-muted); cursor: pointer;" onclick="openMistakeEditModal(${m.id}, '${escapeJsString(m.error_type || '')}', '', '${m.status}')">
+              <em>+ Click "Reflect / Classify" to add your root cause analysis and corrective rule</em>
+            </div>
+          `}
         </div>
       `;
     }).join('');
@@ -3160,7 +3588,7 @@ async function populateChapterSelect(subjectSelectId, chapterSelectId, selectedC
   } catch (e) {}
 }
 
-async function populateChapterFilter(selectId) {
+async function populateChapterFilter(selectId, filterSubjectId = null) {
   const el = document.getElementById(selectId);
   if (!el) return;
   const sb = getSupabase();
@@ -3168,10 +3596,151 @@ async function populateChapterFilter(selectId) {
 
   try {
     const curVal = el.value;
-    const { data: chapters } = await sb.from('chapters').select('*, subjects(name)').order('subject_id').order('order_index');
+    let query = sb.from('chapters').select('*, subjects(name)').order('subject_id').order('order_index');
+    if (filterSubjectId) {
+      query = query.eq('subject_id', filterSubjectId);
+    }
+    const { data: chapters } = await query;
     el.innerHTML = '<option value="">All Chapters</option>' +
       (chapters || []).map(c => `<option value="${c.id}" ${curVal == c.id ? 'selected' : ''}>${escapeHtml(c.name)} (${escapeHtml(c.subjects?.name || '')})</option>`).join('');
   } catch (e) {}
+}
+
+function formatTime(totalSeconds) {
+  const s = Math.max(0, parseInt(totalSeconds, 10) || 0);
+  const m = Math.floor(s / 60);
+  const remSec = s % 60;
+  if (m === 0) return `${remSec}s`;
+  return `${m}m ${remSec}s`;
+}
+
+function resolveOptionDetails(rawAns, rawOptions) {
+  let options = [];
+  if (Array.isArray(rawOptions)) {
+    options = rawOptions;
+  } else if (typeof rawOptions === 'string') {
+    try {
+      options = JSON.parse(rawOptions);
+    } catch (e) {
+      options = [];
+    }
+  }
+
+  const str = (rawAns !== null && rawAns !== undefined) ? String(rawAns).trim() : '';
+  if (!str) {
+    return { letter: '', text: 'Unanswered / Skipped', full: 'Unanswered' };
+  }
+
+  // 1. Single letter A-D or a-d
+  const letterMatch = str.match(/^[A-Da-d]$/);
+  if (letterMatch) {
+    const letter = str.toUpperCase();
+    const idx = letter.charCodeAt(0) - 65;
+    const optText = (options && options[idx] !== undefined) ? String(options[idx]).trim() : '';
+    return {
+      letter,
+      text: optText || letter,
+      full: optText ? `${letter}) ${optText}` : letter
+    };
+  }
+
+  // 2. Numeric 1-4
+  const numMatch = str.match(/^[1-9]$/);
+  if (numMatch) {
+    const idx = parseInt(str, 10) - 1;
+    const letter = String.fromCharCode(65 + idx);
+    const optText = (options && options[idx] !== undefined) ? String(options[idx]).trim() : '';
+    return {
+      letter,
+      text: optText || str,
+      full: optText ? `${letter}) ${optText}` : str
+    };
+  }
+
+  // 3. Match against full option text directly first (e.g. 'Article 42')
+  if (options && options.length > 0) {
+    const foundIdx = options.findIndex(opt => String(opt).trim().toLowerCase() === str.toLowerCase());
+    if (foundIdx !== -1) {
+      const letter = String.fromCharCode(65 + foundIdx);
+      const optStr = String(options[foundIdx]).trim();
+      return {
+        letter,
+        text: optStr,
+        full: `${letter}) ${optStr}`
+      };
+    }
+  }
+
+  // 4. String explicitly starting with "A) " or "A. " or "(A) " or "A - "
+  const prefixMatch = str.match(/^\(?([A-Da-d])\)?(?:[:.\-]\s*|\s+)(.*)$/);
+  if (prefixMatch) {
+    const letter = prefixMatch[1].toUpperCase();
+    const rest = prefixMatch[2].trim();
+    if (rest) {
+      return { letter, text: rest, full: `${letter}) ${rest}` };
+    }
+    const idx = letter.charCodeAt(0) - 65;
+    const optText = (options && options[idx] !== undefined) ? String(options[idx]).trim() : '';
+    return {
+      letter,
+      text: optText || letter,
+      full: optText ? `${letter}) ${optText}` : letter
+    };
+  }
+
+  return { letter: '', text: str, full: str };
+}
+
+function renderCompleteOptionsGrid(rawOptions, userAns, correctAns) {
+  let options = [];
+  if (Array.isArray(rawOptions)) {
+    options = rawOptions;
+  } else if (typeof rawOptions === 'string') {
+    try {
+      options = JSON.parse(rawOptions);
+    } catch (e) {
+      options = [];
+    }
+  }
+
+  if (!options || options.length === 0) return '';
+
+  const userDet = resolveOptionDetails(userAns, options);
+  const corrDet = resolveOptionDetails(correctAns, options);
+
+  return `
+    <div class="mcq-options-grid">
+      ${options.map((opt, idx) => {
+        const letter = String.fromCharCode(65 + idx);
+        const optStr = String(opt).trim();
+        
+        const isUserChoice = Boolean(userDet.letter && userDet.letter === letter) || (userDet.text && userDet.text.toLowerCase() === optStr.toLowerCase());
+        const isCorrectChoice = Boolean(corrDet.letter && corrDet.letter === letter) || (corrDet.text && corrDet.text.toLowerCase() === optStr.toLowerCase());
+
+        let cardClass = 'mcq-option-box';
+        let badgeHtml = '';
+
+        if (isCorrectChoice && isUserChoice) {
+          cardClass += ' is-correct';
+          badgeHtml = '<span class="opt-badge" style="background:#10b981; color:#fff;">✓ Your Choice (Correct)</span>';
+        } else if (isCorrectChoice) {
+          cardClass += ' is-correct';
+          badgeHtml = '<span class="opt-badge" style="background:#10b981; color:#fff;">✓ Correct Answer</span>';
+        } else if (isUserChoice) {
+          cardClass += ' is-user-wrong';
+          badgeHtml = '<span class="opt-badge" style="background:#ef4444; color:#fff;">✗ Your Choice</span>';
+        }
+
+        return `
+          <div class="${cardClass}">
+            <span class="opt-letter">${letter}</span>
+            <span class="opt-text">${escapeHtml(optStr)}</span>
+            ${badgeHtml}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function escapeHtml(text) {
